@@ -1,0 +1,2 @@
+load ipsg_interface.maude
+erew run .

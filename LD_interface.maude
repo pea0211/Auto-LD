@@ -1,0 +1,428 @@
+load IPSG/ipsg_interface.maude
+load LD_grammar.maude
+load LD_lemma_discovery.maude
+
+mod LD is
+  pr MTP .
+  pr LD-GRAMMAR .
+  pr LEMMA-DISCOVERY .
+
+   vars Text : String .
+   vars TL IN : TermList .
+   vars T T2 : Term .
+   vars N : Nat .
+   var  Ty : Type .
+   var  AtS : AttributeSet .
+   vars INSP1 : IPSGInputSpec .
+   vars MS1 : IPSGModuleSpec .
+   vars PRSCS1 : IPSGProofScores .
+
+   ***                           ***
+   ***       User command        ***
+   ***                           ***
+   crl [LDparseComm] : gotLine(cafeInMaude, stdin, Text)
+   < cafeInMaude : CIM | state: idle, input: IN, AtS >
+   => < cafeInMaude : CIM | state: executeComm, input: TL, AtS >
+   if {T, Ty} := metaParse(LDGRAMMAR, tokenize(Text), '@Input@)
+   /\ TL := extractTerms(T) .
+
+   ***                        ***
+   ***          ERROR         ***
+   ***                        ***
+   crl [LDparseCommError] : gotLine(cafeInMaude, stdin, Text)
+   < cafeInMaude : CIM | state: idle, AtS >
+   => < cafeInMaude : CIM | state: print&idle, AtS >
+   write(stdout, cafeInMaude, "The introduced command does not exit.\n")
+   if noParse(N) := metaParse(LDGRAMMAR, tokenize(Text), '@Input@) .
+
+****************
+****************
+*** Lemma_Discovery
+
+   --------------------------------------------------------------------------
+   --- Show proof score by id
+   --------------------------------------------------------------------------
+   rl [showprsc-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'show`prsc`by_.['neTokenList[T]],
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude, "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [showprsc] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'show`prsc`by_.['neTokenList[T]],
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            showPrscLastStr(INSP1, MS1, PRSCS1, psIdInputStr(T)) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   rl [showprsc-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('show`prsc`by_.['neTokenList[T]], TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude, "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [showprsc-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('show`prsc`by_.['neTokenList[T]], TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            showPrscLastStr(INSP1, MS1, PRSCS1, psIdInputStr(T)) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   --------------------------------------------------------------------------
+   --- List false cases
+   --------------------------------------------------------------------------
+   rl [listfalsecases-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`false`cases`.,
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude, "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [listfalsecases] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`false`cases`.,
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            falseCaseReportLastStr(INSP1, PRSCS1) + "\n")
+      if INSP1 =/= null /\ PRSCS1 =/= null .
+
+   rl [listfalsecases-no-data-ann] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`false`cases`..@Input@,
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude, "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [listfalsecases-ann] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`false`cases`..@Input@,
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            falseCaseReportLastStr(INSP1, PRSCS1) + "\n")
+      if INSP1 =/= null /\ PRSCS1 =/= null .
+
+   rl [listfalsecases-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('list`false`cases`., TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude, "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [listfalsecases-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('list`false`cases`., TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            falseCaseReportLastStr(INSP1, PRSCS1) + "\n")
+      if INSP1 =/= null /\ PRSCS1 =/= null .
+
+   --------------------------------------------------------------------------
+   --- List symbolic state forms of the currently loaded protocol
+   --------------------------------------------------------------------------
+   rl [listsymbolicstateforms-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`symbolic`state`forms`.,
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored protocol information. Run IPSG on a protocol first.\n") .
+
+   crl [listsymbolicstateforms] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`symbolic`state`forms`.,
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            listSymbolicStateFormsStr(INSP1, MS1) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null .
+
+   rl [listsymbolicstateforms-no-data-ann] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`symbolic`state`forms`..@Input@,
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored protocol information. Run IPSG on a protocol first.\n") .
+
+   crl [listsymbolicstateforms-ann] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'list`symbolic`state`forms`..@Input@,
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            listSymbolicStateFormsStr(INSP1, MS1) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null .
+
+   rl [listsymbolicstateforms-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('list`symbolic`state`forms`., TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored protocol information. Run IPSG on a protocol first.\n") .
+
+   crl [listsymbolicstateforms-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('list`symbolic`state`forms`., TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            listSymbolicStateFormsStr(INSP1, MS1) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null .
+
+   --------------------------------------------------------------------------
+   --- Classify assumptions by proof score ID
+   --------------------------------------------------------------------------
+   rl [classifyassumptions-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'classify`assumptions`by_.['neTokenList[T]],
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [classifyassumptions] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'classify`assumptions`by_.['neTokenList[T]],
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            classifyAssumptionsByIdStrLD(
+              INSP1, MS1, PRSCS1, psIdInputStr(T)) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   rl [classifyassumptions-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('classify`assumptions`by_.['neTokenList[T]], TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [classifyassumptions-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('classify`assumptions`by_.['neTokenList[T]], TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            classifyAssumptionsByIdStrLD(
+              INSP1, MS1, PRSCS1, psIdInputStr(T)) + "\n")
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   --------------------------------------------------------------------------
+   --- Construct ORT of a seed equation and list feasible branches
+   --------------------------------------------------------------------------
+   rl [ortofseed-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'ORT`of_.['neTokenList[T]],
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored protocol information. Run IPSG on a protocol first.\n") .
+
+   crl [ortofseed] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'ORT`of_.['neTokenList[T]],
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            ortOfSeedInputLastStrLD(INSP1, MS1, seedEqInputStr(T)))
+      if INSP1 =/= null /\ MS1 =/= null .
+
+   rl [ortofseed-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('ORT`of_.['neTokenList[T]], TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored protocol information. Run IPSG on a protocol first.\n") .
+
+   crl [ortofseed-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('ORT`of_.['neTokenList[T]], TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            ortOfSeedInputLastStrLD(INSP1, MS1, seedEqInputStr(T)))
+      if INSP1 =/= null /\ MS1 =/= null .
+   
+   --------------------------------------------------------------------------
+   --- Derived equations of <seed-equation> by <proof-score-id>
+   --------------------------------------------------------------------------
+
+   rl [derivedequationsof-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'derived`equations`of_by_.['neTokenList[T], 'neTokenList[T2]],
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [derivedequationsof] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'derived`equations`of_by_.['neTokenList[T], 'neTokenList[T2]],
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            derivedEquationsOfSeedByIdStrLD(
+              INSP1,
+              MS1,
+              PRSCS1,
+              seedEqInputStr(T),
+              psIdInputStr(T2)))
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   rl [derivedequationsof-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('derived`equations`of_by_.['neTokenList[T], 'neTokenList[T2]], TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [derivedequationsof-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('derived`equations`of_by_.['neTokenList[T], 'neTokenList[T2]], TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            derivedEquationsOfSeedByIdStrLD(
+              INSP1,
+              MS1,
+              PRSCS1,
+              seedEqInputStr(T),
+              psIdInputStr(T2)))
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+
+   --------------------------------------------------------------------------
+   --- Candidate lemmas of <seed-equation> by <proof-score-id>
+   --------------------------------------------------------------------------
+
+   rl [candidatelemmasof-no-data] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'candidate`lemmas`of_by_.['neTokenList[T], 'neTokenList[T2]],
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [candidatelemmasof] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: 'candidate`lemmas`of_by_.['neTokenList[T], 'neTokenList[T2]],
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: empty,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            candidateLemmasOfSeedByIdStrLD(
+              INSP1,
+              MS1,
+              PRSCS1,
+              seedEqInputStr(T),
+              psIdInputStr(T2)))
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+
+   rl [candidatelemmasof-no-data-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('candidate`lemmas`of_by_.['neTokenList[T], 'neTokenList[T2]], TL),
+         ipsgLast: < null ; null ; null >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < null ; null ; null >, AtS >
+         write(stdout, cafeInMaude,
+            "No stored proof scores. Run IPSG on a protocol first.\n") .
+
+   crl [candidatelemmasof-queued] :
+      < cafeInMaude : CIM | state: executeComm,
+         input: ('candidate`lemmas`of_by_.['neTokenList[T], 'neTokenList[T2]], TL),
+         ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+      => < cafeInMaude : CIM | state: print&idle,
+            input: TL,
+            ipsgLast: < INSP1 ; MS1 ; PRSCS1 >, AtS >
+         write(stdout, cafeInMaude,
+            candidateLemmasOfSeedByIdStrLD(
+              INSP1,
+              MS1,
+              PRSCS1,
+              seedEqInputStr(T),
+              psIdInputStr(T2)))
+      if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null .
+endm
+
+set print conceal on .
+print conceal current:_ .
+print conceal msorts:_ .
+print conceal ptree:_ .
+print conceal macros:_ .
+print conceal scoreinfo:_ .
+
+set print attribute on .
+set show advisories off .

@@ -1,0 +1,3838 @@
+***(
+  Lemma discovery support commands for IPSG.
+
+  This file contains only lemma-discovery-related helper functions.
+  The current step only supports listing symbolic state forms.
+)
+mod LD-COMMON is
+  pr IPSG-HANDLE .
+  pr META-LEVEL .
+
+  --- Ordered Gamma list, preserves insertion order.
+  sort GammaList .
+  subsort Equation < GammaList .
+
+  op emptyG : -> GammaList .
+  op _;G_ : GammaList GammaList -> GammaList [assoc id: emptyG] .
+
+  sorts ORTLeaf ORTNode ORT .
+  subsort ORTLeaf < ORTNode .
+  subsort ORTNode < ORT .
+
+  --- non-terminal node: current equation + Gamma
+  op node : Equation GammaList -> ORTNode .
+
+  --- terminal nodes / leaves
+  op trueLeaf : -> ORTLeaf .
+  op falseLeaf : -> ORTLeaf .
+  op similarLeaf : Equation -> ORTLeaf .
+  op invalidLeaf : Equation -> ORTLeaf .
+
+  --- set of ORT nodes
+  op emptyN : -> ORT .
+  op _+N_ : ORT ORT -> ORT [assoc comm idem id: emptyN] .
+
+  sorts ORTBranch ORTBranchSet .
+  subsort ORTBranch < ORTBranchSet .
+
+  --- branch(symbolic state form, Gamma, leaf)
+  op branch : Term GammaList ORTLeaf -> ORTBranch .
+
+  op emptyB : -> ORTBranchSet .
+  op _++_ : ORTBranchSet ORTBranchSet -> ORTBranchSet [assoc comm idem id: emptyB] .
+
+  sorts DerivedItem DerivedSet .
+  subsort DerivedItem < DerivedSet .
+
+  --- der(original seed, branch-level seed instance, Gamma, E[v/s],
+  ---     affected equation e, derived equation d)
+  ---
+  --- E[v/s]:
+  ---   the assumption set after substituting v for s,
+  ---   excluding the seed equation
+  ---
+  --- affected equation:
+  ---   e in Aff_{E[v/s]}
+  ---
+  --- derived equation:
+  ---   lhs(e) = x''
+  op der : Equation Equation GammaList EquationSet Equation Equation -> DerivedItem .
+
+  op emptyD : -> DerivedSet .
+  op _+++_ : DerivedSet DerivedSet -> DerivedSet [assoc comm idem id: emptyD] .
+
+  --- Qids and operator names
+  vars ModName ParamName ParamSortName EffCondOpName ObserverName qName OpName : Qid .
+
+  --- Strings
+  vars InputStr CleanSeedStr ObserverStr StateStr ArgStr TargetStr : String .
+
+  --- IPSG structures
+  vars InputSpec : IPSGInputSpec .
+  vars ModuleSpec : IPSGModuleSpec .
+  var InvTarget : InvariantTarget .
+  var InvTargets : InvTargetList .
+  var ProofScore : IPSGProofScore .
+  var ProofScoreList : PrscList .
+  var EqMap : MapNatEquation .
+
+  --- Meta-level module components
+  var ProtocolMod : Module .
+  var Imports : ImportList .
+  var Sorts : SortSet .
+  var SubsortDecls : SubsortDeclSet .
+  var MembAxs : MembAxSet .
+  vars OpDecls : OpDeclSet .
+  var OneOpDecl : OpDecl .
+  vars ReduceType ResultType : Type .
+
+  --- Attributes, sorts, and type lists
+  var Attrs : AttrSet .
+  vars Sort ResultSort StateSort ArgSort : Type .
+  vars ArgSorts : TypeList .
+  vars Params : ParamList .
+
+  --- Equations and equation sets
+  vars Eq Eq2 : Equation .
+  vars Assumptions EQs Gamma : EquationSet .
+  vars G G2 : GammaList .
+
+  --- Terms and term lists
+  vars LhsTerm RhsTerm Term1 Term2 : Term .
+  vars Terms Terms2 : TermList .
+  vars FORMALS ACTUALS : TermList .
+
+  --- Natural numbers and string positions
+  vars N N1 N2 N3 N4 : Nat .
+  
+  --------------------------------------------------------------------------
+  --- Print equation sets
+  --------------------------------------------------------------------------
+  op eqSet2StrLD : EquationSet Module -> String .
+  op eq2StrLD : Equation Module -> String .
+
+  eq eqSet2StrLD(none, ProtocolMod) = "" .
+
+  eq eqSet2StrLD(Eq, ProtocolMod)
+    = eq2StrLD(Eq, ProtocolMod) .
+
+  eq eqSet2StrLD(Eq Assumptions, ProtocolMod)
+    = eq2StrLD(Eq, ProtocolMod) + eqSet2StrLD(Assumptions, ProtocolMod)
+    [owise] .
+
+  eq eq2StrLD(eq LhsTerm = RhsTerm [none] ., ProtocolMod)
+    = "  eq "
+      + myDownTermStr(LhsTerm, ProtocolMod)
+      + " = "
+      + myDownTermStr(RhsTerm, ProtocolMod)
+      + " .\n" .
+
+  --------------------------------------------------------------------------
+  --- MapNatEquation -> EquationSet
+  --------------------------------------------------------------------------
+  op mapNatEq2EqSetLD : MapNatEquation -> EquationSet .
+
+  eq mapNatEq2EqSetLD(empty) = none .
+  eq mapNatEq2EqSetLD((N |-> Eq, EqMap)) = Eq mapNatEq2EqSetLD(EqMap) .
+
+  --------------------------------------------------------------------------
+  --- Find a proof score by ID in a proof score list.
+  --------------------------------------------------------------------------
+  op findProofScoreByIdLD : PrscList String -> PrscList .
+
+  eq findProofScoreByIdLD((nil).PrscList, InputStr)
+    = (nil).PrscList .
+
+  ceq findProofScoreByIdLD(ProofScore ProofScoreList, InputStr)
+    = ProofScore
+    if psId2String(getPrscId(ProofScore)) == normalizePsIdString(InputStr) .
+
+  eq findProofScoreByIdLD(ProofScore ProofScoreList, InputStr)
+    = findProofScoreByIdLD(ProofScoreList, InputStr)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Check if an equation occurs in an equation set 
+  --------------------------------------------------------------------------
+  op occursEqLD : Equation EquationSet -> Bool .
+
+  eq occursEqLD(Eq, none) = false .
+  eq occursEqLD(Eq, Eq Assumptions) = true .
+  eq occursEqLD(Eq, Eq2 Assumptions) = occursEqLD(Eq, Assumptions) [owise] .
+
+  --------------------------------------------------------------------------
+  --- Set difference for equations: EQs1 \ EQs2
+  --------------------------------------------------------------------------
+  op eqSetMinusLD : EquationSet EquationSet -> EquationSet .
+  op memberEqLD : Equation EquationSet -> Bool .
+
+  eq memberEqLD(Eq, none) = false .
+  eq memberEqLD(Eq, Eq Assumptions) = true .
+  eq memberEqLD(Eq, Eq2 Assumptions) = memberEqLD(Eq, Assumptions) [owise] .
+
+  eq eqSetMinusLD(none, EQs) = none .
+  eq eqSetMinusLD(Eq Assumptions, EQs)
+    =
+      if memberEqLD(Eq, EQs)
+      then eqSetMinusLD(Assumptions, EQs)
+      else Eq eqSetMinusLD(Assumptions, EQs)
+      fi .
+
+  --------------------------------------------------------------------------
+  --- Replace terms in a term according to a list of old terms and new terms.
+  --------------------------------------------------------------------------
+  op replaceManyLD : Term TermList TermList -> Term .
+  op replaceTermLD : Term Term Term -> Term .
+  op replaceTLLD : TermList Term Term -> TermList .
+
+  vars CurrentTerm OldTerm NewTerm : Term .
+
+  ceq replaceTermLD(CurrentTerm, OldTerm, NewTerm) = NewTerm if CurrentTerm == OldTerm .
+  eq replaceTermLD(ModName[Terms], OldTerm, NewTerm) = ModName[replaceTLLD(Terms, OldTerm, NewTerm)] .
+  eq replaceTermLD(CurrentTerm, OldTerm, NewTerm) = CurrentTerm [owise] .
+
+  eq replaceTLLD(empty, OldTerm, NewTerm) = empty .
+  eq replaceTLLD((CurrentTerm , Terms), OldTerm, NewTerm)
+    = replaceTermLD(CurrentTerm, OldTerm, NewTerm), replaceTLLD(Terms, OldTerm, NewTerm) .
+  eq replaceTLLD(CurrentTerm, OldTerm, NewTerm) = replaceTermLD(CurrentTerm, OldTerm, NewTerm) [owise] .
+  
+  eq replaceManyLD(CurrentTerm, empty, empty) = CurrentTerm .
+  eq replaceManyLD(CurrentTerm, (OldTerm , Terms), (NewTerm , Terms2))
+    = replaceManyLD(replaceTermLD(CurrentTerm, OldTerm, NewTerm), Terms, Terms2) .
+  eq replaceManyLD(CurrentTerm, OldTerm, NewTerm)
+    = replaceTermLD(CurrentTerm, OldTerm, NewTerm) .
+
+  --------------------------------------------------------------------------
+  --- effective condition equations
+  --------------------------------------------------------------------------
+  op effectiveCondEqsLD : IPSGProofScore IPSGModuleSpec -> EquationSet .
+  op params2ConstTermsLD : ParamList -> TermList .
+  op firstParamConstTermLD : ParamList -> Term .
+  op effectiveCondEqsFromSpecLD : Qid TermList EquationSet Module -> EquationSet .
+  op effCondNameLD : Qid -> Qid .
+
+  vars TransName : Qid .
+
+  eq effCondNameLD(TransName) = qid("c-" + qid2IdString(TransName)) .
+
+  --- Construct constant terms directly from parameters, without metaParse.
+  eq params2ConstTermsLD((nil).ParamList) = empty .
+  eq params2ConstTermsLD(param(ParamName, ParamSortName) Params)
+    = qid(string(ParamName) + "." + string(ParamSortName)) , params2ConstTermsLD(Params) .
+
+  eq firstParamConstTermLD(param(ParamName, ParamSortName) Params)
+    = qid(string(ParamName) + "." + string(ParamSortName)) .
+
+  ceq effectiveCondEqsLD(ProofScore, ModuleSpec)
+    =
+      effectiveCondEqsFromSpecLD(
+        effCondNameLD(getInvTransName(ProofScore)),
+        params2ConstTermsLD(getInvTransParams(ProofScore)),
+        getEqs(getSpecModule(ModuleSpec)),
+        getSpecModule(ModuleSpec))
+    if getInvTransName(ProofScore) =/= '`, .
+  eq effectiveCondEqsLD(ProofScore, ModuleSpec)
+    = none [owise] .
+
+  eq effectiveCondEqsFromSpecLD(EffCondOpName, ACTUALS, none, ProtocolMod)
+    = none .
+  ceq effectiveCondEqsFromSpecLD(EffCondOpName, ACTUALS,
+      (eq EffCondOpName[FORMALS] = RhsTerm [none] . EQs), ProtocolMod)
+    =
+      condTerm2EqsLD(replaceManyLD(RhsTerm, FORMALS, ACTUALS), ProtocolMod)
+    if true .
+  eq effectiveCondEqsFromSpecLD(EffCondOpName, ACTUALS, EQs, ProtocolMod)
+    =
+      effectiveCondEqsFromSpecLD(EffCondOpName, ACTUALS, EQs, ProtocolMod) [owise] .
+
+  --------------------------------------------------------------------------
+  --- convert a condition term into positive equations
+  --------------------------------------------------------------------------
+  op condTerm2EqsLD : Term Module -> EquationSet .
+  op condTermList2EqsLD : TermList Module -> EquationSet .
+
+  eq condTerm2EqsLD('_and_[Terms], ProtocolMod) = condTermList2EqsLD(Terms, ProtocolMod) .
+  eq condTerm2EqsLD(Term1, ProtocolMod) = posEqFromCondLD(Term1, ProtocolMod) [owise] .
+  
+  eq condTermList2EqsLD(empty, ProtocolMod) = none .
+  eq condTermList2EqsLD((Term1 , Terms), ProtocolMod)
+    = condTerm2EqsLD(Term1, ProtocolMod)
+      condTermList2EqsLD(Terms, ProtocolMod) .
+  eq condTermList2EqsLD(Term1, ProtocolMod)
+    = condTerm2EqsLD(Term1, ProtocolMod) [owise] .
+
+  --------------------------------------------------------------------------
+  --- recognize condition term shapes
+  --------------------------------------------------------------------------
+  op isEqTermLD : Term -> Bool .
+  op isNotTermLD : Term -> Bool .
+
+  eq isEqTermLD('_=_[LhsTerm, RhsTerm]) = true .
+  eq isEqTermLD(Term1) = false [owise] .
+  eq isNotTermLD('not_[Term1]) = true .
+  eq isNotTermLD(Term1) = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- orient a condition as an assumption equation
+  ---
+  --- Examples:
+  ---   ws = pc(s,r1)              -> pc(s,r1) = ws
+  ---   r1 = top(queue(s))         -> top(queue(s)) = r1
+  ---   not locked(s)              -> locked(s) = false
+  ---   c-enter(s,r1)              -> c-enter(s,r1) = true
+  --------------------------------------------------------------------------
+  op posEqFromCondLD : Term Module -> Equation .
+
+  ceq posEqFromCondLD('_=_[LhsTerm, RhsTerm], ProtocolMod)
+    = eq RhsTerm = LhsTerm [none] .
+    if LhsTerm :: Constant /\ not(RhsTerm :: Constant) .
+
+  ceq posEqFromCondLD('_=_[LhsTerm, RhsTerm], ProtocolMod)
+    = eq LhsTerm = RhsTerm [none] .
+    if RhsTerm :: Constant /\ not(LhsTerm :: Constant) .
+
+  eq posEqFromCondLD('_=_[LhsTerm, RhsTerm], ProtocolMod)
+    = (eq LhsTerm = RhsTerm [none] .) [owise] .
+
+  ceq posEqFromCondLD('not_[Term1], ProtocolMod)
+    = eq Term1 = 'false.Bool [none] .
+    if true .
+
+  ceq posEqFromCondLD(Term1, ProtocolMod)
+    = eq Term1 = 'true.Bool [none] .
+    if not(isEqTermLD(Term1)) /\ not(isNotTermLD(Term1)) .
+
+  --------------------------------------------------------------------------
+  --- Build a module for parsing
+  ---
+  --- Seed equations such as pc(s,q)=cs mention constants s, p, q, etc.
+  --- These constants come from the invariant target parameters, so we add
+  --- them to the protocol module before parsing.
+  --------------------------------------------------------------------------
+  op seedParseModuleLD : IPSGInputSpec IPSGModuleSpec -> Module .
+  op addConstOpsLD : Module ParamList -> Module .
+  op genConstOpsLD : ParamList -> OpDeclSet .
+  op lowerParamsLD : ParamList -> ParamList .
+  op firstTargetParamsLD : InvTargetList -> ParamList .
+  op firstTargetStateSortLD : InvTargetList -> Type .
+  op firstTargetStateConstLD : InvTargetList -> Term .
+
+  eq seedParseModuleLD(InputSpec, ModuleSpec)
+    =
+      addConstOpsLD(
+        getSpecModule(ModuleSpec),
+        firstTargetParamsLD(getInputSpecInvsTarget(InputSpec))) .
+
+  eq firstTargetParamsLD((nil).InvTargetList) = (nil).ParamList .
+  eq firstTargetParamsLD(InvTarget InvTargets) = getInvParams(InvTarget) .
+ 
+  eq firstTargetStateSortLD(InvTarget InvTargets) = getParamType(getInvIndVar(InvTarget)) .
+
+  eq firstTargetStateConstLD((nil).InvTargetList)
+    = 'false.Bool .
+  eq firstTargetStateConstLD(InvTarget InvTargets)
+    =
+      qid(
+        string(toLowerCaseQ(getParamName(getInvIndVar(InvTarget))))
+        + "."
+        + string(getParamType(getInvIndVar(InvTarget)))) .
+
+  --- Add constants such as s : Sys, p : Pid, q : Pid
+  --- to the protocol module so that seed equations like pc(s,q)=cs
+  --- can be parsed.
+  eq addConstOpsLD(
+      fth ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs Assumptions endfth,
+      Params)
+    =
+      fth ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls genConstOpsLD(lowerParamsLD(Params))
+        MembAxs
+        Assumptions
+      endfth .
+  eq addConstOpsLD(
+      fmod ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs Assumptions endfm,
+      Params)
+    =
+      fmod ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls genConstOpsLD(lowerParamsLD(Params))
+        MembAxs
+        Assumptions
+      endfm .
+
+  eq lowerParamsLD((nil).ParamList) = (nil).ParamList .
+  eq lowerParamsLD(param(ParamName, ParamSortName) Params)
+    =
+      param(toLowerCaseQ(ParamName), ParamSortName)
+      lowerParamsLD(Params) .
+
+  eq genConstOpsLD((nil).ParamList) = none .
+  eq genConstOpsLD(param(ParamName, ParamSortName) Params)
+    =
+      op ParamName : nil -> ParamSortName [none] .
+      genConstOpsLD(Params) .
+
+  --------------------------------------------------------------------------
+  --- Nat helpers used by the seed parser
+  --------------------------------------------------------------------------
+  op incLD : Nat -> Nat .
+  op subLD : Nat Nat -> Nat .
+  op betweenLD : Nat Nat -> Nat .
+
+  eq incLD(N) = s(N) .
+
+  eq subLD(N, 0) = N .
+  eq subLD(0, N) = 0 [owise] .
+  eq subLD(s(N1), s(N2)) = subLD(N1, N2) .
+
+  --- length between two delimiters, excluding both delimiters:
+  --- betweenLD(i,j) = j - i - 1
+  eq betweenLD(N1, N2) = subLD(subLD(N2, N1), 1) .
+
+  --------------------------------------------------------------------------
+  --- Parse the seed equation
+  ---
+  --- Supported form:
+  ---   <term> = <term>
+  ---
+  --- Examples:
+  ---   pc(s,q) = cs
+  ---   locked(s) = true
+  ---   top(queue(s)) = r1
+  ---   obs(s,p,q) = v
+  --------------------------------------------------------------------------
+  op parseSeedEqLD : String Module -> Equation .
+  op parsedSeedBoolTerm2EqLD : Term -> Equation .
+  op invalidSeedEqLD : -> Equation .
+
+  var eqTerm : Term .
+
+  ceq parseSeedEqLD(InputStr, ProtocolMod)
+    =
+      parsedSeedBoolTerm2EqLD(eqTerm)
+    if {eqTerm, ResultType} :=
+         metaParse(ProtocolMod, tokenize(InputStr), 'Bool) .
+
+  eq parseSeedEqLD(InputStr, ProtocolMod)
+    = invalidSeedEqLD [owise] .
+
+  eq parsedSeedBoolTerm2EqLD('_=_[LhsTerm, RhsTerm])
+    = eq LhsTerm = RhsTerm [none] . .
+
+  eq parsedSeedBoolTerm2EqLD(eqTerm)
+    = invalidSeedEqLD [owise] .
+
+  eq invalidSeedEqLD
+    = eq 'false.Bool = 'true.Bool [none] . .
+
+  --------------------------------------------------------------------------
+  --- Convert ordered GammaList to EquationSet
+  ---
+  --- This is used only when calling metaReduce, because meta-level modules
+  --- still expect equations as an EquationSet.
+  --------------------------------------------------------------------------
+  op gammaList2EqSetLD : GammaList -> EquationSet .
+
+  eq gammaList2EqSetLD(emptyG) = none .
+
+  eq gammaList2EqSetLD(Eq) = Eq .
+
+  eq gammaList2EqSetLD(Eq ;G G)
+    = Eq gammaList2EqSetLD(G) [owise] .
+
+  --------------------------------------------------------------------------
+  --- Reduction support under Gamma
+  ---
+  --- Gamma used by ORT is represented as GammaList to preserve order.
+  --- When calling metaReduce, GammaList is converted to EquationSet by
+  --- gammaList2EqSetLD.
+  --------------------------------------------------------------------------
+  op addGammaToModuleLD : Module EquationSet -> Module .
+  op eqToBoolTermLD : Equation -> Term .
+  op reduceEqBoolUnderGammaLD : Equation Module EquationSet -> Term .
+  op reduceTermUnderGammaLD : Term Module EquationSet -> Term .
+  op normalizeEqUnderGammaLD : Equation Module EquationSet -> Equation .
+
+  vars Result ReduceTerm : Term .
+
+  --- Add Gamma as equations to the protocol module
+  eq addGammaToModuleLD(ProtocolMod, none) = ProtocolMod .
+  eq addGammaToModuleLD(
+      fth ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EQs endfth,
+      Gamma)
+    =
+      fth ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls
+        MembAxs
+        EQs
+        Gamma
+      endfth .
+  eq addGammaToModuleLD(
+      fmod ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EQs endfm,
+      Gamma)
+    =
+      fmod ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls
+        MembAxs
+        EQs
+        Gamma
+      endfm .
+
+  --- Reduce a whole equation as a Boolean term
+  eq eqToBoolTermLD(eq LhsTerm = RhsTerm [Attrs] .)
+    = '_=_[LhsTerm, RhsTerm] .
+
+  ceq reduceEqBoolUnderGammaLD(Eq, ProtocolMod, Gamma)
+    = Result
+    if {Result, ReduceType} := metaReduce(
+          addGammaToModuleLD(ProtocolMod, Gamma),
+          eqToBoolTermLD(Eq)) .
+
+  ceq reduceTermUnderGammaLD(Term1, ProtocolMod, Gamma)
+    = ReduceTerm
+    if {ReduceTerm, ReduceType} := metaReduce(
+          addGammaToModuleLD(ProtocolMod, Gamma),
+          Term1) .
+
+  eq normalizeEqUnderGammaLD(eq LhsTerm = RhsTerm [Attrs] ., ProtocolMod, Gamma)
+    =
+      eq reduceTermUnderGammaLD(LhsTerm, ProtocolMod, Gamma)
+      = reduceTermUnderGammaLD(RhsTerm, ProtocolMod, Gamma)
+      [none] . .
+
+  --------------------------------------------------------------------------
+  --- Simple term printer 
+  --------------------------------------------------------------------------
+  op term2StrLD : Term -> String .
+  op termList2StrLD : TermList -> String .
+  op termListTail2StrLD : TermList -> String .
+  op qidBaseStrLD : Qid -> String .
+  op qidTypedStrLD : String -> String .
+  op typeSuffixLD : String -> String .
+  op baseNameLD : String -> String .
+
+  op gamma2StrLD : EquationSet -> String .
+  op gammaTail2StrLD : EquationSet -> String .
+  op gammaList2StrLD : GammaList -> String .
+  op gammaListTail2StrLD : GammaList -> String .
+
+
+  eq qidBaseStrLD(ModName) = qidTypedStrLD(string(ModName)) .
+
+  ceq baseNameLD(InputStr)
+    = substr(InputStr, 0, N)
+    if N := find(InputStr, ".", 0) /\ N < length(InputStr) .
+  eq baseNameLD(InputStr) = InputStr [owise] .
+
+  ceq typeSuffixLD(InputStr)
+    = substr(InputStr, s(N), subLD(length(InputStr), s(N)))
+    if N := find(InputStr, ".", 0) /\ s(N) < length(InputStr) .
+  eq typeSuffixLD(InputStr) = "" [owise] .
+
+  eq qidTypedStrLD(InputStr) = InputStr .
+
+  eq term2StrLD('_=_[LhsTerm, RhsTerm])
+    = "(" + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) + ")" .
+  eq term2StrLD('_implies_[Term1, Term2])
+    =
+      "("
+      + term2StrLD(Term1)
+      + " implies "
+      + term2StrLD(Term2)
+      + ")" .
+  eq term2StrLD('not_[Term1])
+    = "not " + term2StrLD(Term1) .
+  eq term2StrLD(OpName[Terms])
+    = qidBaseStrLD(OpName) + "(" + termList2StrLD(Terms) + ")" .
+  eq term2StrLD(qName)
+    = qidBaseStrLD(qName) [owise] .
+
+  eq termList2StrLD(empty) = "" .
+  eq termList2StrLD((Term1 , Terms))
+    = term2StrLD(Term1) + termListTail2StrLD(Terms) .
+  eq termList2StrLD(Term1)
+    = term2StrLD(Term1) [owise] .
+
+  eq termListTail2StrLD(empty) = "" .
+  eq termListTail2StrLD((Term1 , Terms))
+    = "," + term2StrLD(Term1) + termListTail2StrLD(Terms) .
+  eq termListTail2StrLD(Term1)
+    = "," + term2StrLD(Term1) [owise] .
+
+  eq gamma2StrLD(none) = "" .
+  eq gamma2StrLD(eq LhsTerm = RhsTerm [none] .)
+    = term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) .
+  eq gamma2StrLD((eq LhsTerm = RhsTerm [none] .) Assumptions)
+    =
+      term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm)
+      + gammaTail2StrLD(Assumptions)
+    [owise] .
+
+  eq gammaTail2StrLD(none) = "" .
+  eq gammaTail2StrLD(eq LhsTerm = RhsTerm [none] .)
+    = "; " + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) .
+  eq gammaTail2StrLD((eq LhsTerm = RhsTerm [none] .) EQs)
+    =
+      "; " + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm)
+      + gammaTail2StrLD(EQs)
+    [owise] .
+
+  eq gammaList2StrLD(emptyG) = "" .
+
+  eq gammaList2StrLD(eq LhsTerm = RhsTerm [none] .)
+    = term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) .
+
+  eq gammaList2StrLD((eq LhsTerm = RhsTerm [none] .) ;G G)
+    =
+      term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm)
+      + gammaListTail2StrLD(G)
+    [owise] .
+
+  eq gammaListTail2StrLD(emptyG) = "" .
+
+  eq gammaListTail2StrLD(eq LhsTerm = RhsTerm [none] .)
+    = "; " + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) .
+
+  eq gammaListTail2StrLD((eq LhsTerm = RhsTerm [none] .) ;G G)
+    =
+      "; " + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm)
+      + gammaListTail2StrLD(G)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Helpers for naming state variables in symbolic state forms
+  --------------------------------------------------------------------------
+  op sortVarNameLD : Type Nat -> String .
+  op sortFirstLetterLD : Type -> String .
+
+  eq sortFirstLetterLD(Sort)
+    = string(toLowerCaseQ(qid(substr(string(Sort), 0, 1)))) .
+
+  eq sortVarNameLD(Sort, N)
+    = sortFirstLetterLD(Sort) + string(N, 10) .
+
+endm
+
+--------------------------------------------------------------------------
+--- Module for listing symbolic state forms.
+--------------------------------------------------------------------------
+mod LD-SYMBOLIC is
+  pr LD-COMMON .
+
+  vars OpName : Qid .
+  vars InputSpec : IPSGInputSpec .
+  vars ModuleSpec : IPSGModuleSpec .
+  var InvTarget : InvariantTarget .
+  var InvTargets : InvTargetList .
+  vars Attrs : AttrSet .
+  vars Sort ResultSort : Type .
+  vars ArgSorts : TypeList .
+  vars OpDecls : OpDeclSet .
+  var N : Nat .
+
+  --------------------------------------------------------------------------
+  --- List symbolic state forms.
+  --------------------------------------------------------------------------
+  op listSymbolicStateForms : IPSGInputSpec IPSGModuleSpec -> TermList .
+  op listSymbolicStateFormsByTargets : InvTargetList IPSGModuleSpec -> TermList .
+  op opDeclSet2StateFormsTL : OpDeclSet -> TermList .
+  op opDecl2StateFormTerm : OpDecl -> Term .
+  op typeList2VarTermsSymbolic : TypeList Nat -> TermList .
+  op listSymbolicStateFormsStr : IPSGInputSpec IPSGModuleSpec -> String .
+  op listSymbolicStateFormsByTargetsStr : IPSGInputSpec InvTargetList IPSGModuleSpec -> String .
+
+  --------------------------------------------------------------------------
+  --- 1. Construct symbolic state forms as a TermList
+  --------------------------------------------------------------------------
+  eq listSymbolicStateForms(InputSpec, ModuleSpec)
+    =
+      listSymbolicStateFormsByTargets(
+        getInputSpecInvsTarget(InputSpec),
+        ModuleSpec) .
+
+  eq listSymbolicStateFormsByTargets((nil).InvTargetList, ModuleSpec)
+    = empty .
+
+  eq listSymbolicStateFormsByTargets(InvTarget InvTargets, ModuleSpec)
+    =
+      opDeclSet2StateFormsTL(
+        getInitOps(
+          getParamType(getInvIndVar(InvTarget)),
+          getMSOps(ModuleSpec))
+        getTransOpS(
+          getParamType(getInvIndVar(InvTarget)),
+          getMSOps(ModuleSpec))) .
+
+  eq opDeclSet2StateFormsTL(none) = empty .
+
+  eq opDeclSet2StateFormsTL(
+      (op OpName : ArgSorts -> ResultSort [Attrs] .) OpDecls)
+    =
+      opDecl2StateFormTerm(
+        op OpName : ArgSorts -> ResultSort [Attrs] .)
+      ,
+      opDeclSet2StateFormsTL(OpDecls) .
+
+  --- Initial state form, e.g. init : -> Sys.
+  --- Return meta-term init.Sys.
+  eq opDecl2StateFormTerm(
+      op OpName : (nil).TypeList -> ResultSort [Attrs] .)
+    = qid(string(OpName) + "." + string(ResultSort)) .
+
+  --- Transition state form, e.g. enter : Sys Pid -> Sys.
+  --- Return meta-term enter(s0.Sys,p1.Pid).
+  eq opDecl2StateFormTerm(
+      op OpName : ArgSorts -> ResultSort [Attrs] .)
+    = OpName[typeList2VarTermsSymbolic(ArgSorts, 0)]
+    [owise] .
+
+  eq typeList2VarTermsSymbolic((nil).TypeList, N) = empty .
+
+  eq typeList2VarTermsSymbolic(Sort ArgSorts, N)
+    =
+      qid(sortVarNameLD(Sort, N) + "." + string(Sort))
+      ,
+      typeList2VarTermsSymbolic(ArgSorts, incLD(N)) .
+
+  --------------------------------------------------------------------------
+  --- Print symbolic state forms as a string.
+  --------------------------------------------------------------------------
+  eq listSymbolicStateFormsStr(InputSpec, ModuleSpec)
+    =
+      listSymbolicStateFormsByTargetsStr(
+        InputSpec,
+        getInputSpecInvsTarget(InputSpec),
+        ModuleSpec) .
+
+  eq listSymbolicStateFormsByTargetsStr(InputSpec, (nil).InvTargetList, ModuleSpec)
+    =
+      "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n"
+      + "No invariant target is available. Load an IPSG input file first.\n" .
+
+  eq listSymbolicStateFormsByTargetsStr(InputSpec, InvTarget InvTargets, ModuleSpec)
+    =
+      "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n"
+      + "Symbolic state forms Sigma_s for state sort "
+      + string(getParamType(getInvIndVar(InvTarget))) + ":\n"
+      + "  "
+      + termList2StrLD(listSymbolicStateForms(InputSpec, ModuleSpec))
+      + "\n" .
+
+endm
+
+--------------------------------------------------------------------------
+--- Module for classifying assumptions of a proof score.
+--------------------------------------------------------------------------
+mod LD-CLASSIFY is
+  pr LD-COMMON .
+
+  var ModName : Qid .
+  vars InputStr : String .
+  vars InputSpec : IPSGInputSpec .
+  var ModuleSpec : IPSGModuleSpec .
+  var ProofScore : IPSGProofScore .
+  var ProofScoreList : PrscList .
+  var ProofScores : IPSGProofScores .
+  var ProtocolMod : Module .
+  vars Attrs : AttrSet .
+  vars Eq Eq2 : Equation .
+  vars Assumptions ECond EState OtherAssumps : EquationSet .
+  vars LhsTerm RhsTerm Term1 StateTerm : Term .
+
+  --------------------------------------------------------------------------
+  --- classify assumptions by proof-score ID
+  --------------------------------------------------------------------------
+  op classifyAssumptionsByIdStrLD : IPSGInputSpec IPSGModuleSpec IPSGProofScores String -> String .
+  op classifyAssumptionsFoundStrLD : Qid IPSGModuleSpec PrscList String -> String .
+  op classifyAssumptionsPrscStrLD : Qid IPSGModuleSpec IPSGProofScore -> String .
+
+  eq classifyAssumptionsByIdStrLD(InputSpec, ModuleSpec, ProofScores, InputStr)
+    = "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n" +
+      classifyAssumptionsFoundStrLD(
+        getInputSpecMod(InputSpec),
+        ModuleSpec,
+        findProofScoreByIdLD(getPrscList(ProofScores), normalizePsIdString(InputStr)),
+        normalizePsIdString(InputStr)) .
+
+  eq classifyAssumptionsFoundStrLD(ModName, ModuleSpec, (nil).PrscList, InputStr)
+    =
+      "No proof score with ID " + normalizePsIdString(InputStr)
+      + " in protocol " + string(ModName) + ".\n" .
+
+  eq classifyAssumptionsFoundStrLD(ModName, ModuleSpec, ProofScore, InputStr)
+    = classifyAssumptionsPrscStrLD(ModName, ModuleSpec, ProofScore) .
+
+  ceq classifyAssumptionsPrscStrLD(ModName, ModuleSpec, ProofScore)
+    =
+      "Proof score ID: " + psId2String(getPrscId(ProofScore)) + "\n" +
+      "Assumption partition for lemma discovery\n" +
+
+      "E:\n" +
+      eqSet2StrLD(Assumptions, ProtocolMod) +
+
+      "EState:\n" +
+      eqSet2StrLD(EState, ProtocolMod) +
+
+      "ECond:\n" +
+      eqSet2StrLD(ECond, ProtocolMod) +
+
+      "EOther:\n" +
+      eqSet2StrLD(OtherAssumps, ProtocolMod) 
+
+      --- "Seed equation:\n" +
+      --- eqSet2StrLD(chooseSeedEqLD(EState, none, StateTerm), ProtocolMod)
+      if ProtocolMod := getSpecModule(ModuleSpec) /\
+        StateTerm := firstParamConstTermLD(getInvTargetParams(ProofScore)) /\
+        Assumptions := mapNatEq2EqSetLD(getPrscMapEqs(ProofScore)) /\
+        ECond := effectiveCondEqsLD(ProofScore, ModuleSpec) /\
+        EState := selectStateEqsLD(Assumptions, ECond, StateTerm) /\
+        OtherAssumps := eqSetMinusLD(eqSetMinusLD(Assumptions, ECond), EState) .
+
+  --------------------------------------------------------------------------
+  --- State-equation selection
+  --------------------------------------------------------------------------
+  op chooseSeedEqLD : EquationSet EquationSet Term -> EquationSet .
+  op selectStateEqsLD : EquationSet EquationSet Term -> EquationSet .
+  op isStateEqLD : Equation Term -> Bool .
+
+  eq isStateEqLD(eq LhsTerm = RhsTerm [Attrs] ., Term1) = checkExist(Term1, LhsTerm) or checkExist(Term1, RhsTerm) .
+  
+  eq selectStateEqsLD(none, ECond, StateTerm) = none .
+  ceq selectStateEqsLD(Eq Assumptions, ECond, StateTerm)
+    =  Eq selectStateEqsLD(Assumptions, ECond, StateTerm)
+    if isStateEqLD(Eq, StateTerm) /\ not occursEqLD(Eq, ECond) .
+  eq selectStateEqsLD(Eq Assumptions, ECond, StateTerm)
+    = selectStateEqsLD(Assumptions, ECond, StateTerm) [owise] .
+
+  eq chooseSeedEqLD(none, ECond, StateTerm) = none .
+  ceq chooseSeedEqLD(Eq Assumptions, ECond, StateTerm)
+    = Eq
+    if not occursEqLD(Eq, ECond) /\ isStateEqLD(Eq, StateTerm) .
+  eq chooseSeedEqLD(Eq Assumptions, ECond, StateTerm) = chooseSeedEqLD(Assumptions, ECond, StateTerm) [owise] .
+
+endm
+
+--------------------------------------------------------------------------
+--- Module for build ORT tree.
+--------------------------------------------------------------------------
+mod LD-ORT is
+  pr LD-SYMBOLIC .
+
+  --- Generic matching
+  sort MatchSubstLD .
+
+  vars ModName OpName : Qid .
+  vars TransName ObserverName : Qid .
+
+  vars InputStr TargetStr NameStr TypeStr : String .
+  vars InputSpec : IPSGInputSpec .
+  var ModuleSpec : IPSGModuleSpec .
+
+  var ProtocolMod : Module .
+  var Imports : ImportList .
+  var Sorts : SortSet .
+  var SubsortDecls : SubsortDeclSet .
+  var MembAxs : MembAxSet .
+  vars OpDecls : OpDeclSet .
+
+  vars Attrs Attrs1 Attrs2 : AttrSet .
+  vars Sort ResultSort : Type .
+  vars ArgSorts : TypeList .
+
+  vars Eq Eq1 Eq2 SeedEq SeedInstEq SpecEq : Equation .
+  vars Assumptions SubstAssumps EqSet SpecEqSet : EquationSet .
+  var G Gamma : GammaList .
+
+  vars LhsTerm RhsTerm Lhs1 Rhs1 Lhs2 Rhs2 : Term .
+  vars StateTerm SpecStateTerm SeedStateTerm : Term .
+  vars SeedArg TargetValue ObsArg StateForm : Term .
+  vars RHS THEN ELSE CTERM : Term .
+  var Term Term1 Term2 T1 T2 : Term .
+
+  vars FORMALS ACTUALS TL1 TL2 : TermList .
+  vars Terms Terms1 Terms2 : TermList .
+
+  var COND : EqCondition .
+
+  vars N : Nat .
+
+  var Branch : ORTBranch .
+  vars Branches : ORTBranchSet .
+  var Leaf : ORTLeaf .
+  --- ORT nodes
+  vars Node Node2 : ORTNode .
+  vars ORTNodes : ORT .
+  vars StateForms : TermList .
+  vars BoolResult : Term .
+  vars CondGamma NegCondGamma : GammaList .
+  vars EffGamma RestEffGamma : GammaList .
+  var EffEq : Equation .
+
+  vars MS MS1 MS2 : MatchSubstLD .
+  vars Subst Subst2 : EquationSet .
+  vars Cond1 Cond2 : EqCondition .
+  vars CurArgs SpecArgs : TermList .
+  vars CurrentLhs Current SpecLhs : Term .
+
+  --------------------------------------------------------------------------
+  --- ORT construction from a seed equation
+  ---
+  --- Logical order:
+  ---   1. Handle the user command ORT of <seed>.
+  ---   2. Build a parsing module containing proof-score constants.
+  ---   3. Parse the seed equation entered by the user.
+  ---   4. Enumerate symbolic state forms and instantiate the seed.
+  ---   5. Develop each ORT branch by reducing the current equation under Gamma.
+  ---   6. Split branches when an unresolved condition is encountered.
+  ---   7. Stop at trueLeaf, falseLeaf, similarLeaf, or invalidLeaf.
+  ---   8. Print all leaves and then feasible branches.
+  --------------------------------------------------------------------------
+
+  --------------------------------------------------------------------------
+  --- User command entry
+  ---
+  --- ORT of e .
+  --- Parses the seed equation e, constructs all ORT branches, then prints
+  --- all terminal leaves and feasible branches.
+  --------------------------------------------------------------------------
+  op ortOfSeedInputLastStrLD : IPSGInputSpec IPSGModuleSpec String -> String .
+  op noneIfEmptyBranchesLD : String -> String .
+
+  ceq ortOfSeedInputLastStrLD(InputSpec, ModuleSpec, InputStr)
+    =
+      "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n" +
+      "Seed equation: " + InputStr + "\n" +
+      ortBranchReportStrLD(
+        ortBranchesOfSeedLD(parseSeedEqLD(InputStr, ProtocolMod), InputSpec, ModuleSpec))
+    if ProtocolMod := seedParseModuleLD(InputSpec, ModuleSpec) .
+
+  eq noneIfEmptyBranchesLD("") = "  (none)\n" .
+  eq noneIfEmptyBranchesLD(InputStr) = InputStr [owise] . 
+
+  --------------------------------------------------------------------------
+  --- Root expansion by symbolic state forms
+  ---
+  --- 1. Start from root node:
+  ---      node(SeedEq, emptyG)
+  ---
+  --- 2. Get symbolic state forms by:
+  ---      listSymbolicStateForms(InputSpec, ModuleSpec)
+  ---
+  --- 3. For each symbolic state form v:
+  ---      node(SeedEq[v/s], emptyG)
+  ---
+  --- 4. Reduce each instance node.
+  --------------------------------------------------------------------------
+  op ortBranchesOfSeedLD : Equation IPSGInputSpec IPSGModuleSpec -> ORTBranchSet .
+  op stateFormsORTLD : TermList ORTNode Module Equation Term -> ORTBranchSet .
+  op makeInstanceNodeLD : ORTNode Term Term -> ORTNode .
+  --- create e_sd[v/s]
+  op seedInstanceEqLD : Equation Term Term -> Equation .
+  --- Add symbolic constants occurring in symbolic state forms.
+  op addSymConstOpsForStateFormORTLD : Module Term -> Module .
+  op stateFormArgSortsORTLD : Term -> TypeList .
+  op termListSortsORTLD : TermList -> TypeList .
+  op constTermSortORTLD : Term -> Type .
+  op addSymConstOpsLD : Module TypeList Nat -> Module .
+  op genSymConstOpsLD : TypeList Nat -> OpDeclSet .
+
+  eq ortBranchesOfSeedLD(SeedEq, InputSpec, ModuleSpec)
+    =
+      stateFormsORTLD(
+        listSymbolicStateForms(InputSpec, ModuleSpec),
+        node(SeedEq, emptyG),
+        seedParseModuleLD(InputSpec, ModuleSpec),
+        SeedEq,
+        firstTargetStateConstLD(getInputSpecInvsTarget(InputSpec))) .
+
+  --------------------------------------------------------------------------
+  --- Reduce each symbolic state form
+  --------------------------------------------------------------------------
+  eq stateFormsORTLD(
+      empty,
+      Node,
+      ProtocolMod,
+      SeedEq,
+      SeedStateTerm)
+    = emptyB .
+
+  eq stateFormsORTLD(
+      (StateForm , StateForms),
+      Node,
+      ProtocolMod,
+      SeedEq,
+      SeedStateTerm)
+    =
+      reduceEqORTLD(
+        StateForm,
+        makeInstanceNodeLD(Node, StateForm, SeedStateTerm),
+        addSymConstOpsForStateFormORTLD(ProtocolMod, StateForm),
+        SeedEq,
+        SeedStateTerm)
+      ++
+      stateFormsORTLD(
+        StateForms,
+        Node,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm) .
+
+  eq stateFormsORTLD(
+      StateForm,
+      Node,
+      ProtocolMod,
+      SeedEq,
+      SeedStateTerm)
+    =
+      reduceEqORTLD(
+        StateForm,
+        makeInstanceNodeLD(Node, StateForm, SeedStateTerm),
+        addSymConstOpsForStateFormORTLD(ProtocolMod, StateForm),
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Create instance node from root node
+  --------------------------------------------------------------------------
+  eq makeInstanceNodeLD(
+      node(SeedEq, Gamma),
+      StateForm,
+      SeedStateTerm)
+    =
+      node(
+        seedInstanceEqLD(SeedEq, SeedStateTerm, StateForm),
+        Gamma) .
+
+  eq seedInstanceEqLD(
+      eq LhsTerm = RhsTerm [Attrs] .,
+      SeedStateTerm,
+      StateForm)
+    =
+      eq replaceTermLD(LhsTerm, SeedStateTerm, StateForm)
+       = replaceTermLD(RhsTerm, SeedStateTerm, StateForm)
+      [Attrs] . .
+
+  --------------------------------------------------------------------------
+  --- Add symbolic constants from one symbolic state form
+  --------------------------------------------------------------------------
+  eq addSymConstOpsForStateFormORTLD(ProtocolMod, StateForm)
+    =
+      addSymConstOpsLD(
+        ProtocolMod,
+        stateFormArgSortsORTLD(StateForm),
+        0) .
+
+  --- Transition symbolic state form, e.g. enter(s0.Sys,p1.Pid).
+  eq stateFormArgSortsORTLD(OpName[Terms])
+    = termListSortsORTLD(Terms) .
+
+  --- Initial symbolic state form, e.g. init.Sys.
+  eq stateFormArgSortsORTLD(Term1)
+    = (nil).TypeList [owise] .
+
+  eq termListSortsORTLD(empty)
+    = (nil).TypeList .
+
+  eq termListSortsORTLD((Term1 , Terms))
+    = constTermSortORTLD(Term1)
+      termListSortsORTLD(Terms) .
+
+  eq termListSortsORTLD(Term1)
+    = constTermSortORTLD(Term1) [owise] .
+
+  ceq constTermSortORTLD(Term1)
+    = qid(typeSuffixLD(string(Term1)))
+    if Term1 :: Constant .
+
+  --------------------------------------------------------------------------
+  --- Add symbolic constants such as s0 : Sys, p1 : Pid to ProtocolMod
+  --------------------------------------------------------------------------
+  eq addSymConstOpsLD(
+      fth ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EqSet endfth,
+      ArgSorts,
+      N)
+    =
+      fth ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls genSymConstOpsLD(ArgSorts, N)
+        MembAxs
+        EqSet
+      endfth .
+  eq addSymConstOpsLD(
+      fmod ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EqSet endfm,
+      ArgSorts,
+      N)
+    =
+      fmod ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls genSymConstOpsLD(ArgSorts, N)
+        MembAxs
+        EqSet
+      endfm .
+
+  eq genSymConstOpsLD((nil).TypeList, N)
+    = none .
+
+  eq genSymConstOpsLD(Sort ArgSorts, N)
+    = op qid(sortVarNameLD(Sort, N)) : nil -> Sort [none] .
+      genSymConstOpsLD(ArgSorts, s(N)) .
+
+  --------------------------------------------------------------------------
+  --- Main ORT node development
+  ---
+  --- A current ORT node is:
+  ---
+  ---   node(CurrentEq, Gamma)
+  ---
+  --- reduceEqORTLD reduces the whole equation as a Boolean term:
+  ---
+  ---   metaReduce(Spec + Gamma, eqToBoolTermLD(CurrentEq))
+  ---
+  --- The result is a Term:
+  ---
+  ---   true.Bool
+  ---   false.Bool
+  ---   or a term
+  ---
+  --- If the result is true/false, we create a terminal branch.
+  --- If the result is a term, we create new node with the reduced equation:
+  ---
+  ---   eq reduce(lhs) = reduce(rhs) [none] .
+  ---
+  --- and continue checking similarity, if-then-else, and protocol equations.
+  --------------------------------------------------------------------------
+
+  --- reduce a current ORT node (e, Gamma)
+  op reduceEqORTLD : Term ORTNode Module Equation Term -> ORTBranchSet .
+  op reduceEqResultORTLD : Term ORTNode Term Module Equation Term -> ORTBranchSet .
+  op reduceEqFromCurrentEqORTLD : Term ORTNode Module Equation Term -> ORTBranchSet .
+  op reduceEqBySpecORTLD : Term ORTNode EquationSet Module Equation Term -> ORTBranchSet .
+  op gammaHasEqLD : GammaList Equation -> Bool .
+  op gammaContainsGammaLD : GammaList GammaList -> Bool .
+  op splitEffCondGammaORTLD : Term Equation GammaList GammaList Module Equation Term -> ORTBranchSet .
+
+  --------------------------------------------------------------------------
+  --- 1. Reduce the current node equation as a Boolean term
+  --------------------------------------------------------------------------
+  ceq reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    =
+      reduceEqResultORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        BoolResult,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if BoolResult :=
+         reduceEqBoolUnderGammaLD(
+           Eq,
+           ProtocolMod,
+           gammaList2EqSetLD(Gamma)) .
+
+  --------------------------------------------------------------------------
+  --- 2. If the Boolean reduction result is true/false, create a leaf
+  --------------------------------------------------------------------------
+  eq reduceEqResultORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        'true.Bool,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = branch(StateForm, Gamma, trueLeaf) .
+
+  eq reduceEqResultORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        'false.Bool,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = branch(StateForm, Gamma, falseLeaf) .
+
+  --------------------------------------------------------------------------
+  --- 3. Otherwise, create new node with eq reduce(lhs) = reduce(rhs)
+  ---    and continue reducing the new node.
+  --------------------------------------------------------------------------
+  eq reduceEqResultORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        BoolResult,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    =
+      reduceEqFromCurrentEqORTLD(
+        StateForm,
+        node(
+          normalizeEqUnderGammaLD(Eq, ProtocolMod, gammaList2EqSetLD(Gamma)),
+          Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Similarity checking between the current equation and the seed equation
+  --------------------------------------------------------------------------
+  op isSimilarEqToSeedLD : Equation Equation Term -> Bool .
+  op isSimilarTermToSeedLD : Term Term Term -> Bool .
+  op isSimilarTermListToSeedLD : TermList TermList Term -> Bool .
+
+  op isStateConstantRenamingLD : Term Term -> Bool .
+  op sameConstSortLD : Term Term -> Bool .
+  op isProperStateConstantLD : Term -> Bool .
+  op isGeneratedStateConstLD : Term -> Bool .
+  op hasGeneratedStateConstNameLD : String String -> Bool .
+
+  --- isSimilarEqToSeedLD(CurrentEq, SeedEq, SeedStateTerm)
+  --- CurrentEq     : equation in leaf/node ORT
+  --- SeedEq        : seed equation
+  --- SeedStateTerm : state constant in seed equation, e.g. s.Sys
+  ceq isSimilarEqToSeedLD(
+        eq Lhs1 = Rhs1 [Attrs1] .,
+        eq Lhs2 = Rhs2 [Attrs2] .,
+        SeedStateTerm)
+    = true
+    if isSimilarTermToSeedLD(Lhs1, Lhs2, SeedStateTerm)
+    /\ isSimilarTermToSeedLD(Rhs1, Rhs2, SeedStateTerm) .
+
+  eq isSimilarEqToSeedLD(Eq1, Eq2, SeedStateTerm)
+    = false [owise] .
+
+  --- identical terms are similar
+  ceq isSimilarTermToSeedLD(Term1, Term2, SeedStateTerm)
+    = true if Term1 == Term2 .
+
+  --- current state constant may be renamed to the seed state constant
+  ceq isSimilarTermToSeedLD(Term1, SeedStateTerm, SeedStateTerm)
+    = true if isStateConstantRenamingLD(Term1, SeedStateTerm) .
+
+  --- same operator application: compare arguments recursively
+  ceq isSimilarTermToSeedLD(OpName[Terms1], OpName[Terms2], SeedStateTerm)
+    = true
+    if isSimilarTermListToSeedLD(Terms1, Terms2, SeedStateTerm) .
+  eq isSimilarTermToSeedLD(Term1, Term2, SeedStateTerm)
+    = false [owise] .
+
+  eq isSimilarTermListToSeedLD(empty, empty, SeedStateTerm) = true .
+
+  ceq isSimilarTermListToSeedLD((T1 , TL1), (T2 , TL2), SeedStateTerm)
+    = true
+    if isSimilarTermToSeedLD(T1, T2, SeedStateTerm)
+    /\ isSimilarTermListToSeedLD(TL1, TL2, SeedStateTerm) .
+
+  ceq isSimilarTermListToSeedLD(T1, T2, SeedStateTerm)
+    = true if isSimilarTermToSeedLD(T1, T2, SeedStateTerm) .
+
+  eq isSimilarTermListToSeedLD(TL1, TL2, SeedStateTerm)
+    = false [owise] .
+
+  --- Only generated symbolic state constants, e.g. s0.Sys, can rename s.Sys.
+  --- This prevents init.Sys from being treated as similar to s.Sys.
+  ceq isStateConstantRenamingLD(StateTerm, SeedStateTerm)
+    = true
+    if StateTerm =/= SeedStateTerm
+    /\ isGeneratedStateConstLD(StateTerm)
+    /\ SeedStateTerm :: Constant
+    /\ sameConstSortLD(StateTerm, SeedStateTerm) .
+
+  eq isStateConstantRenamingLD(StateTerm, SeedStateTerm)
+    = false [owise] .
+
+  ceq isGeneratedStateConstLD(StateTerm)
+    = true
+    if StateTerm :: Constant
+    /\ hasGeneratedStateConstNameLD(
+        baseNameLD(string(StateTerm)),
+        typeSuffixLD(string(StateTerm))) .
+  eq isGeneratedStateConstLD(StateTerm)
+    = false [owise] .
+
+  ceq hasGeneratedStateConstNameLD(NameStr, TypeStr)
+    = true
+    if 1 < length(NameStr)
+    /\ substr(NameStr, 0, 1) == sortFirstLetterLD(qid(TypeStr)) .
+  eq hasGeneratedStateConstNameLD(NameStr, TypeStr)
+    = false [owise] .
+
+  --- Function application is not a state constant.
+  eq isProperStateConstantLD(OpName[Terms]) = false .
+  ceq isProperStateConstantLD(Term)
+    = true if Term :: Constant .
+  eq isProperStateConstantLD(Term)
+    = false [owise] .
+
+  ceq sameConstSortLD(StateTerm, SeedStateTerm)
+    = true
+    if typeSuffixLD(string(StateTerm)) == typeSuffixLD(string(SeedStateTerm)) .
+  eq sameConstSortLD(StateTerm, SeedStateTerm)
+    = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- 4. Check whether the current equation is similar to the seed equation
+  --------------------------------------------------------------------------
+  ceq reduceEqFromCurrentEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = branch(StateForm, Gamma, similarLeaf(Eq))
+    if isSimilarEqToSeedLD(Eq, SeedEq, SeedStateTerm) .
+
+  --------------------------------------------------------------------------
+  --- Gamma construction for case splitting
+  ---
+  --- Positive condition:
+  ---   c              ==> c = true
+  ---   x = y          ==> x = y
+  ---
+  --- Negative condition:
+  ---   c = true       ==> c = false
+  ---   x = y          ==> (x = y) = false
+  --------------------------------------------------------------------------
+  op orientEqGammaORTLD : Term Term -> Equation .
+
+  ceq orientEqGammaORTLD(LhsTerm, RhsTerm)
+    = eq RhsTerm = LhsTerm [none] .
+    if LhsTerm :: Constant
+    /\ RhsTerm :: Constant
+    /\ not isGeneratedStateConstLD(LhsTerm)
+    /\ isGeneratedStateConstLD(RhsTerm) .
+
+  eq orientEqGammaORTLD(LhsTerm, RhsTerm)
+    = eq LhsTerm = RhsTerm [none] .
+    [owise] .
+
+  op cond2GammaListBySubstLD : EqCondition EquationSet -> GammaList .
+  op negGammaListLD : GammaList -> GammaList .
+  op negGammaEqLD : Equation -> Equation .
+  op condTerm2GammaListORTLD : Term -> GammaList .
+  op negCondTerm2GammaListORTLD : Term -> GammaList .
+
+  --- Conditions coming from ceq ... if COND .
+  --- The substitution is obtained by generic matching between
+  --- the current LHS and the specification LHS.
+  eq cond2GammaListBySubstLD(nil, Subst) = emptyG .
+  eq cond2GammaListBySubstLD(LhsTerm = RhsTerm, Subst)
+    =
+      orientEqGammaORTLD(
+        applySubstTermLD(LhsTerm, Subst),
+        applySubstTermLD(RhsTerm, Subst)) .
+  eq cond2GammaListBySubstLD(LhsTerm := RhsTerm, Subst)
+    =
+      eq applySubstTermLD(LhsTerm, Subst)
+      = applySubstTermLD(RhsTerm, Subst)
+      [none] . .
+  eq cond2GammaListBySubstLD(Cond1 /\ Cond2, Subst)
+    =
+      cond2GammaListBySubstLD(Cond1, Subst)
+      ;G
+      cond2GammaListBySubstLD(Cond2, Subst) .
+  eq cond2GammaListBySubstLD(COND, Subst)
+    = emptyG [owise] .
+
+  eq negGammaListLD(emptyG) = emptyG .
+  eq negGammaListLD(Eq) = negGammaEqLD(Eq) .
+  eq negGammaListLD(Eq ;G G)
+    =
+      negGammaEqLD(Eq)
+      ;G
+      negGammaListLD(G)
+    [owise] .
+
+  --- not (t = true)  ==>  t = false
+  eq negGammaEqLD(eq Term1 = 'true.Bool [none] .)
+    = eq Term1 = 'false.Bool [none] . .
+    
+  --- not (t = false)  ==>  t = true
+  eq negGammaEqLD(eq Term1 = 'false.Bool [none] .)
+    = eq Term1 = 'true.Bool [none] . .
+
+  --- not (x = y)  ==>  (x = y) = false
+  eq negGammaEqLD(eq LhsTerm = RhsTerm [none] .)
+    = eq '_=_[LhsTerm, RhsTerm] = 'false.Bool [none] .
+   [owise] .
+
+  --- Conditions coming from unreduced if-then-else terms.
+  eq condTerm2GammaListORTLD('_=_[LhsTerm, RhsTerm])
+    = orientEqGammaORTLD(LhsTerm, RhsTerm) .
+
+  eq condTerm2GammaListORTLD(Term1)
+    = eq Term1 = 'true.Bool [none] .
+    [owise] .
+
+  eq negCondTerm2GammaListORTLD('_=_[LhsTerm, RhsTerm])
+    = negGammaEqLD(orientEqGammaORTLD(LhsTerm, RhsTerm)) .
+    --- = eq '_=_[LhsTerm, RhsTerm] = 'false.Bool [none] . .
+
+  eq negCondTerm2GammaListORTLD(Term1)
+    = eq Term1 = 'false.Bool [none] .
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Gamma membership helpers
+  ---
+  --- Used to avoid splitting again on the same condition.
+  --------------------------------------------------------------------------
+  eq gammaHasEqLD(emptyG, Eq) = false .
+  ceq gammaHasEqLD(Eq2, Eq) 
+    = true if Eq2 == Eq .
+  eq gammaHasEqLD(Eq2, Eq) = false [owise] .
+
+  ceq gammaHasEqLD(Eq2 ;G G, Eq)
+    = true if Eq2 == Eq .
+  eq gammaHasEqLD(Eq2 ;G G, Eq)
+    = gammaHasEqLD(G, Eq) [owise] .
+
+  eq gammaContainsGammaLD(Gamma, emptyG) = true .
+  eq gammaContainsGammaLD(Gamma, Eq)
+    = gammaHasEqLD(Gamma, Eq) .
+  eq gammaContainsGammaLD(Gamma, Eq ;G G)
+    =
+      gammaHasEqLD(Gamma, Eq)
+      and
+      gammaContainsGammaLD(Gamma, G)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- 5. Case split caused by if-then-else on the left-hand side
+  ---
+  --- Current equation:
+  ---
+  ---   if CTERM then THEN else ELSE fi = TargetValue
+  ---
+  --- Create two successor nodes:
+  ---
+  ---   node(CurrentEq, Gamma ;G CTERM)
+  ---   node(CurrentEq, Gamma ;G neg CTERM)
+  ---
+  --- The equation itself is kept unchanged. The next metaReduce call will
+  --- reduce it under the extended Gamma.
+  --------------------------------------------------------------------------
+  ceq reduceEqFromCurrentEqORTLD(
+        StateForm,
+        node(
+          eq 'if_then_else_fi[CTERM, THEN, ELSE] = TargetValue [Attrs] .,
+          Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    =
+      reduceEqORTLD(
+        StateForm,
+        node(
+          eq 'if_then_else_fi[CTERM, THEN, ELSE] = TargetValue [Attrs] .,
+          Gamma ;G condTerm2GammaListORTLD(CTERM)),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+      ++
+      reduceEqORTLD(
+        StateForm,
+        node(
+          eq 'if_then_else_fi[CTERM, THEN, ELSE] = TargetValue [Attrs] .,
+          Gamma ;G negCondTerm2GammaListORTLD(CTERM)),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm) 
+    if not gammaContainsGammaLD(Gamma, condTerm2GammaListORTLD(CTERM))
+    /\ not gammaContainsGammaLD(Gamma, negCondTerm2GammaListORTLD(CTERM)) .
+
+  --------------------------------------------------------------------------
+  --- 6. Case split caused by if-then-else on the right-hand side
+  ---
+  --- Current equation:
+  ---
+  ---   TargetValue = if CTERM then THEN else ELSE fi
+  --------------------------------------------------------------------------
+  ceq reduceEqFromCurrentEqORTLD(
+        StateForm,
+        node(
+          eq TargetValue = 'if_then_else_fi[CTERM, THEN, ELSE] [Attrs] .,
+          Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    =
+      reduceEqORTLD(
+        StateForm,
+        node(
+          eq TargetValue = 'if_then_else_fi[CTERM, THEN, ELSE] [Attrs] .,
+          Gamma ;G condTerm2GammaListORTLD(CTERM)),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+      ++
+      reduceEqORTLD(
+        StateForm,
+        node(
+          eq TargetValue = 'if_then_else_fi[CTERM, THEN, ELSE] [Attrs] .,
+          Gamma ;G negCondTerm2GammaListORTLD(CTERM)),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm) 
+    if not gammaContainsGammaLD(Gamma, condTerm2GammaListORTLD(CTERM))
+    /\ not gammaContainsGammaLD(Gamma, negCondTerm2GammaListORTLD(CTERM)) .
+
+  --------------------------------------------------------------------------
+  --- 7. Otherwise, try to reduce by protocol spec equations
+  --------------------------------------------------------------------------
+  eq reduceEqFromCurrentEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    =
+      reduceEqBySpecORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        getEqs(ProtocolMod),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Generic matching: current term against specification pattern
+  --------------------------------------------------------------------------
+  op noMatchLD : -> MatchSubstLD .
+  op substLD : EquationSet -> MatchSubstLD .
+
+  op isMatchLD : MatchSubstLD -> Bool .
+  op getSubstLD : MatchSubstLD -> EquationSet .
+  op mergeSubstLD : MatchSubstLD MatchSubstLD -> MatchSubstLD .
+  op matchSubstTermLD : Term Term -> MatchSubstLD .
+  op matchSubstTermListLD : TermList TermList -> MatchSubstLD .
+
+  eq isMatchLD(noMatchLD) = false .
+  eq isMatchLD(substLD(Subst)) = true .
+
+  eq getSubstLD(substLD(Subst)) = Subst .
+
+  eq mergeSubstLD(noMatchLD, MS) = noMatchLD .
+  eq mergeSubstLD(MS, noMatchLD) = noMatchLD .
+  eq mergeSubstLD(substLD(Subst), substLD(Subst2))
+    = substLD(Subst Subst2) .
+
+  --- If the specification term is a variable, bind it to the current term.
+  ceq matchSubstTermLD(CurrentLhs, SpecLhs)
+    = substLD(eq SpecLhs = CurrentLhs [none] .)
+    if SpecLhs :: Variable .
+
+  --- If the two terms are syntactically equal, no substitution is needed.
+  ceq matchSubstTermLD(CurrentLhs, SpecLhs)
+    = substLD(none)
+    if CurrentLhs == SpecLhs .
+
+  --- If both are applications with the same operator, match their arguments.
+  ceq matchSubstTermLD(OpName[Terms1], OpName[Terms2])
+    = matchSubstTermListLD(Terms1, Terms2)
+    if true .
+
+  eq matchSubstTermLD(CurrentLhs, SpecLhs)
+    = noMatchLD [owise] .
+
+  eq matchSubstTermListLD(empty, empty)
+    = substLD(none) .
+  ceq matchSubstTermListLD((T1 , TL1), (T2 , TL2))
+    =
+      mergeSubstLD(
+        matchSubstTermLD(T1, T2),
+        matchSubstTermListLD(TL1, TL2))
+    if true .
+  ceq matchSubstTermListLD(T1, T2)
+    = matchSubstTermLD(T1, T2)
+    if true .
+  eq matchSubstTermListLD(TL1, TL2)
+    = noMatchLD [owise] .
+
+  --------------------------------------------------------------------------
+  --- Apply a substitution represented as an EquationSet
+  --------------------------------------------------------------------------
+  op applySubstTermLD : Term EquationSet -> Term .
+
+  eq applySubstTermLD(Term1, none) = Term1 .
+  eq applySubstTermLD(Term1, (eq LhsTerm = RhsTerm [none] .) Subst)
+    =
+      applySubstTermLD(
+        replaceTermLD(Term1, LhsTerm, RhsTerm),
+        Subst)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- 8. Search protocol equations
+  ---
+  --- If the current equation matches a conditional protocol equation:
+  ---
+  ---   ceq SpecLhs = RHS if COND .
+  --- 
+  --- then create two successor nodes:
+  ---
+  ---   node(CurrentEq, Gamma ;G COND)
+  ---   node(CurrentEq, Gamma ;G neg COND)
+  ---
+  --- The next reduceEqORTLD call will reduce it under the extended Gamma.
+  --------------------------------------------------------------------------
+
+  --------------------------------------------------------------------------
+  --- No more protocol equations:
+  --- the current node cannot reduce to true, false, or similar.
+  --------------------------------------------------------------------------
+  eq reduceEqBySpecORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        none,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = branch(StateForm, Gamma, invalidLeaf(Eq)) .
+
+  --------------------------------------------------------------------------
+  --- Expand effective conditions in Gamma
+  --- If a Gamma equation is an effective condition, expand it by the
+  --- definition of the corresponding c-xxx operator in the protocol specification.
+  --------------------------------------------------------------------------
+  op eqSet2GammaListORTLD : EquationSet -> GammaList .
+  op expandEffCondGammaORTLD : GammaList Module -> GammaList .
+  op expandEffCondEqORTLD : Equation Module -> GammaList .
+
+  eq eqSet2GammaListORTLD(none) = emptyG .
+  eq eqSet2GammaListORTLD(Eq) = Eq .
+  eq eqSet2GammaListORTLD(Eq EqSet)
+    = Eq ;G eqSet2GammaListORTLD(EqSet)
+    [owise] .
+
+  --- Expand each Gamma equation if it is an effective condition.
+  eq expandEffCondGammaORTLD(emptyG, ProtocolMod) = emptyG .
+
+  eq expandEffCondGammaORTLD(Eq, ProtocolMod)
+    = expandEffCondEqORTLD(Eq, ProtocolMod) .
+
+  eq expandEffCondGammaORTLD(Eq ;G G, ProtocolMod)
+    =
+      expandEffCondEqORTLD(Eq, ProtocolMod)
+      ;G
+      expandEffCondGammaORTLD(G, ProtocolMod)
+    [owise] .
+
+  --- c-xxx(args) = true  ==> expand by the definition of c-xxx in Spec.
+  ceq expandEffCondEqORTLD(
+        eq OpName[ACTUALS] = 'true.Bool [none] .,
+        ProtocolMod)
+    =
+      eqSet2GammaListORTLD(
+        effectiveCondEqsFromSpecLD(
+          OpName,
+          ACTUALS,
+          getEqs(ProtocolMod),
+          ProtocolMod))
+    if substr(string(OpName), 0, 2) == "c-" 
+    /\ effectiveCondEqsFromSpecLD(
+         OpName,
+         ACTUALS,
+         getEqs(ProtocolMod),
+         ProtocolMod) =/= none .
+
+  --- Other equations are kept unchanged.
+  eq expandEffCondEqORTLD(Eq, ProtocolMod) = Eq [owise] .
+
+  --------------------------------------------------------------------------
+  --- Split on expanded effective conditions.
+  ---
+  --- EffGamma contains effective condition equations obtained by:
+  ---   effectiveCondEqsFromSpecLD(...) -> eqSet2GammaListORTLD(...)
+  ---
+  --- We do not generate a branch c-xxx(...) = false.
+  --- Instead, for each effective equation e, we split into:
+  ---   e
+  ---   neg(e)
+  --------------------------------------------------------------------------
+  eq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        emptyG,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm) .
+
+  --- already has the (or neg of) effective condition, no need to split again.
+  ceq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if gammaHasEqLD(Gamma, EffEq) .
+
+  ceq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if gammaHasEqLD(Gamma, negGammaEqLD(EffEq)) .
+
+  --- have only one effective condition + is not in Gamma, split into two branches: 
+  ---  Gamma ;G EffEq
+  ---  Gamma ;G neg(EffEq)
+  eq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma ;G EffEq),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+      ++
+      reduceEqORTLD(
+        StateForm,
+        node(Eq, Gamma ;G negGammaEqLD(EffEq)),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --- have more than one effective condition, split on the first one, then continue splitting on the rest.
+  ceq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq ;G RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if gammaHasEqLD(Gamma, EffEq) .
+
+  ceq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq ;G RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if gammaHasEqLD(Gamma, negGammaEqLD(EffEq)) .
+
+  eq splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma,
+        EffEq ;G RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma ;G EffEq,
+        RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+      ++
+      splitEffCondGammaORTLD(
+        StateForm,
+        Eq,
+        Gamma ;G negGammaEqLD(EffEq),
+        RestEffGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Conditional protocol equation: effective-condition case.
+  ---
+  --- If the condition contains c-xxx(...), expand it by using:
+  ---   effectiveCondEqsFromSpecLD(...)
+  --- then convert EquationSet to GammaList by:
+  ---   eqSet2GammaListORTLD(...)
+  --- and split on the obtained effective conditions.
+  --------------------------------------------------------------------------
+  ceq reduceEqBySpecORTLD(
+        StateForm,
+        node(eq CurrentLhs = TargetValue [Attrs] ., Gamma),
+        ceq SpecLhs = RHS if COND [Attrs2] . SpecEqSet,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = splitEffCondGammaORTLD(
+        StateForm,
+        eq CurrentLhs = TargetValue [Attrs] .,
+        Gamma,
+        CondGamma,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if substLD(Subst) := matchSubstTermLD(CurrentLhs, SpecLhs)
+    /\ checkExist(StateForm, CurrentLhs)
+    /\ G := cond2GammaListBySubstLD(COND, Subst)
+    /\ CondGamma := expandEffCondGammaORTLD(G, ProtocolMod)
+    /\ CondGamma =/= G .
+
+  --------------------------------------------------------------------------
+  --- Conditional protocol equation: ordinary condition case.
+  ---
+  --- If there is no c-xxx(...) to expand, keep the old two-way split:
+  ---   G
+  ---   neg(G)
+  --------------------------------------------------------------------------
+  ceq reduceEqBySpecORTLD(
+        StateForm,
+        node(eq CurrentLhs = TargetValue [Attrs] ., Gamma),
+        ceq SpecLhs = RHS if COND [Attrs2] . SpecEqSet,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqORTLD(
+        StateForm,
+        node(
+          eq CurrentLhs = TargetValue [Attrs] .,
+          Gamma ;G G),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+      ++
+      reduceEqORTLD(
+        StateForm,
+        node(
+          eq CurrentLhs = TargetValue [Attrs] .,
+          Gamma ;G NegCondGamma),
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    if substLD(Subst) := matchSubstTermLD(CurrentLhs, SpecLhs)
+    /\ checkExist(StateForm, CurrentLhs)
+    /\ G := cond2GammaListBySubstLD(COND, Subst)
+    /\ CondGamma := expandEffCondGammaORTLD(G, ProtocolMod)
+    /\ CondGamma == G
+    /\ NegCondGamma := negGammaListLD(G)
+    /\ not gammaContainsGammaLD(Gamma, G)
+    /\ not gammaContainsGammaLD(Gamma, NegCondGamma) .
+
+  --------------------------------------------------------------------------
+  --- Unconditional protocol equation
+  ---
+  --- There is no condition to split.
+  --- We directly rewrite the current equation to:
+  ---
+  ---   RHS[Subst] = TargetValue
+  --------------------------------------------------------------------------
+  --- ceq reduceEqBySpecORTLD(
+  ---       StateForm,
+  ---       node(eq CurrentLhs = TargetValue [Attrs] ., Gamma),
+  ---       eq SpecLhs = RHS [Attrs2] . SpecEqSet,
+  ---       ProtocolMod,
+  ---       SeedEq,
+  ---       SeedStateTerm)
+  ---   =
+  ---     reduceEqORTLD(
+  ---       StateForm,
+  ---       node(
+  ---         eq applySubstTermLD(RHS, Subst) = TargetValue [none] .,
+  ---         Gamma),
+  ---       ProtocolMod,
+  ---       SeedEq,
+  ---       SeedStateTerm)
+  ---   if substLD(Subst) := matchSubstTermLD(CurrentLhs, SpecLhs)
+  ---   /\ applySubstTermLD(RHS, Subst) =/= CurrentLhs .
+
+  --------------------------------------------------------------------------
+  --- Otherwise, continue searching protocol equations
+  --------------------------------------------------------------------------
+  eq reduceEqBySpecORTLD(
+        StateForm,
+        Node,
+        SpecEq SpecEqSet,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    = reduceEqBySpecORTLD(
+        StateForm,
+        Node,
+        SpecEqSet,
+        ProtocolMod,
+        SeedEq,
+        SeedStateTerm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- ORT output report
+  ---
+  --- The command prints:
+  ---   1. all terminal leaves of the ORT;
+  ---   2. feasible branches, i.e., branches ending in trueLeaf.
+  --------------------------------------------------------------------------
+
+  --- Printing all branches
+  op ortBranchReportStrLD : ORTBranchSet -> String .
+  op branchSet2LeavesStrLD : ORTBranchSet -> String .
+  op branch2LeafStrLD : ORTBranch -> String .
+  op leaf2StrLD : ORTLeaf -> String .
+  op eqORT2StrLD : Equation -> String .
+
+  eq ortBranchReportStrLD(Branches)
+    =
+      "ORT leaves:\n"
+      + noneIfEmptyBranchesLD(branchSet2LeavesStrLD(Branches))
+      + "Feasible branches in ORT:\n"
+      + noneIfEmptyBranchesLD(branchSet2FeasibleStrLD(Branches)) .
+
+  eq branchSet2LeavesStrLD(emptyB) = "" .
+  eq branchSet2LeavesStrLD(Branch)
+    = branch2LeafStrLD(Branch) .
+  eq branchSet2LeavesStrLD(Branch ++ Branches)
+    = branch2LeafStrLD(Branch)
+      + branchSet2LeavesStrLD(Branches)
+    [owise] .
+
+  eq branch2LeafStrLD(branch(StateForm, Gamma, Leaf))
+    =
+      "  ("
+      + term2StrLD(StateForm)
+      + ", {"
+      + gammaList2StrLD(Gamma)
+      + "}, "
+      + leaf2StrLD(Leaf)
+      + ")\n" .
+
+  eq leaf2StrLD(trueLeaf) = "trueLeaf" .
+  eq leaf2StrLD(falseLeaf) = "falseLeaf" .
+  eq leaf2StrLD(similarLeaf(Eq))
+    = "similarLeaf(" + eqORT2StrLD(Eq) + ")" .
+  eq leaf2StrLD(invalidLeaf(Eq))
+    = "invalidLeaf(" + eqORT2StrLD(Eq) + ")" .
+  eq leaf2StrLD(Leaf) = "invalidLeaf" [owise] .
+
+  eq eqORT2StrLD(eq LhsTerm = RhsTerm [Attrs] .)
+    = term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm) .
+
+  --- Printing feasible branches
+  op branchSet2FeasibleStrLD : ORTBranchSet -> String .
+  op branch2FeasibleStrLD : ORTBranch -> String .
+
+  eq branchSet2FeasibleStrLD(emptyB) = "" .
+  eq branchSet2FeasibleStrLD(Branch)
+    = branch2FeasibleStrLD(Branch) .
+  eq branchSet2FeasibleStrLD(Branch ++ Branches)
+    =
+      branch2FeasibleStrLD(Branch)
+      + branchSet2FeasibleStrLD(Branches)
+    [owise] .
+  eq branch2FeasibleStrLD(branch(StateForm, Gamma, trueLeaf))
+    = "  (" + term2StrLD(StateForm) + ", {" + gammaList2StrLD(Gamma) + "})\n" .
+  eq branch2FeasibleStrLD(Branch) = "" [owise] .
+
+endm
+
+--------------------------------------------------------------------------
+--- Module for deriving equation form a seed equation and a proof score.
+--------------------------------------------------------------------------
+mod LD-DERIVE is
+  pr LD-ORT .
+
+  vars ModName OpName : Qid .
+  vars InputStr InputStr2 : String .
+
+  vars InputSpec : IPSGInputSpec .
+  var ModuleSpec : IPSGModuleSpec .
+  var ProofScore : IPSGProofScore .
+  var ProofScoreList : PrscList .
+  var ProofScores : IPSGProofScores .
+
+  var ProtocolMod : Module .
+
+  vars Attrs : AttrSet .
+
+  vars Eq Eq2 : Equation .
+  vars SeedEq SeedInstEq : Equation .
+  vars Assumptions SubstAssumps : EquationSet .
+  var Gamma : GammaList .
+  vars AccGamma RestGamma : GammaList .
+
+  vars LhsTerm RhsTerm Term1 : Term .
+  var StateForm StateTerm : Term .
+  vars Terms : TermList .
+  vars ArgSorts : TypeList .
+  var Sort : Type .
+
+  var Branch : ORTBranch .
+  vars Branches : ORTBranchSet .
+
+  var DerItem : DerivedItem .
+  vars DerItems : DerivedSet .
+
+  --------------------------------------------------------------------------
+  --- derived equations of <seed-equation> by <proof-score-id>
+  ---
+  --- For each feasible ORT branch (v, Gamma), we first construct
+  --- E[v/s] by substituting v for s in all assumptions except the
+  --- selected seed equation e_sd.
+  ---
+  --- Then we compute the affected equations:
+  ---
+  ---   Aff_{E[v/s]} = { e[v/s] | e[v/s] =/= e, e in E \ {e_sd} }
+  ---
+  --- For each affected equation e, if lhs(e) reduces under the protocol
+  --- specification and Gamma to a data value x'', we add the derived
+  --- equation:
+  ---
+  ---   lhs(e) = x''
+  --------------------------------------------------------------------------
+  op derivedEquationsOfSeedByIdStrLD : IPSGInputSpec IPSGModuleSpec IPSGProofScores String String -> String .
+  op derivedEquationsOfSeedFoundStrLD : IPSGInputSpec IPSGModuleSpec PrscList Equation String String -> String .
+  op derivedEquationsOfSeedPrscStrLD : IPSGInputSpec IPSGModuleSpec IPSGProofScore Equation String -> String .
+
+  ceq derivedEquationsOfSeedByIdStrLD(InputSpec, ModuleSpec, ProofScores, InputStr, InputStr2)
+    =
+      "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n" +
+      "Seed equation: " + InputStr + "\n" +
+      derivedEquationsOfSeedFoundStrLD(
+        InputSpec,
+        ModuleSpec,
+        findProofScoreByIdLD(getPrscList(ProofScores), normalizePsIdString(InputStr2)),
+        parseSeedEqLD(InputStr, ProtocolMod),
+        normalizePsIdString(InputStr2),
+        InputStr)
+    if ProtocolMod := seedParseModuleLD(InputSpec, ModuleSpec) .
+
+  eq derivedEquationsOfSeedFoundStrLD(InputSpec, ModuleSpec, (nil).PrscList, SeedEq, InputStr, InputStr2)
+    =
+      "No proof score with ID " + normalizePsIdString(InputStr)
+      + " in protocol " + string(getInputSpecMod(InputSpec)) + ".\n" .
+
+  eq derivedEquationsOfSeedFoundStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr, InputStr2)
+    = derivedEquationsOfSeedPrscStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr2) .
+
+  eq derivedEquationsOfSeedPrscStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr)
+    =
+      "Proof score ID: " + psId2String(getPrscId(ProofScore)) + "\n" +
+      "Derived equations:\n" +
+      noneIfEmptyDerivedLD(
+        derivedSet2StrLD(
+          derivedItemsFromSeedLD(SeedEq, InputSpec, ModuleSpec, ProofScore))) .
+
+  --------------------------------------------------------------------------
+  --- Core derive-equation function.
+  ---
+  --- SeedEq is the explicit seed equation e_sd supplied by the command.
+  --- This is the same seed equation used to construct the ORT.
+  ---
+  --- No seed equation is selected from EState here.
+  --------------------------------------------------------------------------
+  op derivedItemsFromSeedLD : Equation IPSGInputSpec IPSGModuleSpec IPSGProofScore -> DerivedSet .
+
+  ceq derivedItemsFromSeedLD(SeedEq, InputSpec, ModuleSpec, ProofScore)
+    =
+      derivedItemsBranchesLD(
+        ortBranchesOfSeedLD(SeedEq, InputSpec, ModuleSpec),
+        Assumptions,
+        SeedEq,
+        StateTerm,
+        InputSpec,
+        ModuleSpec)
+    if StateTerm := firstParamConstTermLD(getInvTargetParams(ProofScore)) /\
+       Assumptions := mapNatEq2EqSetLD(getPrscMapEqs(ProofScore)) .
+
+  --------------------------------------------------------------------------
+  --- Process all branches in the ORT.
+  --------------------------------------------------------------------------
+  op derivedItemsBranchesLD : ORTBranchSet EquationSet Equation Term IPSGInputSpec IPSGModuleSpec -> DerivedSet .
+
+  eq derivedItemsBranchesLD(emptyB, Assumptions, SeedEq, StateTerm, InputSpec, ModuleSpec)
+    = emptyD .
+  eq derivedItemsBranchesLD(Branch ++ Branches, Assumptions, SeedEq, StateTerm, InputSpec, ModuleSpec)
+    =
+      derivedItemsBranchLD(Branch, Assumptions, SeedEq, StateTerm, InputSpec, ModuleSpec)
+      +++
+      derivedItemsBranchesLD(Branches, Assumptions, SeedEq, StateTerm, InputSpec, ModuleSpec) .
+
+  --------------------------------------------------------------------------
+  --- Add symbolic constants occurring in a branch state form
+  ---
+  --- During ORT construction, symbolic constants such as s0:Sys and p1:Pid
+  --- are added to the protocol module.  In the derive phase, we must add
+  --- them again, because seedParseModuleLD only adds proof-score constants
+  --- such as s, p, q, r1.
+  --------------------------------------------------------------------------
+  op addSymConstOpsForStateFormLD : Module Term -> Module .
+  op stateFormArgSortsLD : Term -> TypeList .
+  op termListSortsLD : TermList -> TypeList .
+  op constTermSortLD : Term -> Type .
+
+  eq addSymConstOpsForStateFormLD(ProtocolMod, StateForm)
+    =
+      addSymConstOpsLD(
+        ProtocolMod,
+        stateFormArgSortsLD(StateForm),
+        0) .
+
+  --- Transition state form, e.g. try(s0,p1), enter(s0,p1).
+  eq stateFormArgSortsLD(OpName[Terms])
+    = termListSortsLD(Terms) .
+
+  --- Initial state form, e.g. init.
+  eq stateFormArgSortsLD(Term1)
+    = (nil).TypeList
+    [owise] .
+
+  eq termListSortsLD(empty)
+    = (nil).TypeList .
+
+  eq termListSortsLD((Term1 , Terms))
+    =
+      constTermSortLD(Term1)
+      termListSortsLD(Terms) .
+
+  eq termListSortsLD(Term1)
+    = constTermSortLD(Term1)
+    [owise] .
+
+  ceq constTermSortLD(Term1)
+    = qid(typeSuffixLD(string(Term1)))
+    if Term1 :: Constant .
+
+  --------------------------------------------------------------------------
+  --- Process one feasible branch.
+  ---
+  --- Only branches ending in trueLeaf are feasible.
+  ---
+  --- For branch(v, Gamma, trueLeaf), construct:
+  ---
+  ---   SeedInst = e_sd[v/s]
+  ---   ESub     = E[v/s]
+  ---   Aff      = Aff_{E[v/s]}
+  --------------------------------------------------------------------------
+  op derivedItemsBranchLD : ORTBranch EquationSet Equation Term IPSGInputSpec IPSGModuleSpec -> DerivedSet .
+
+  eq derivedItemsBranchLD(
+        branch(StateForm, Gamma, trueLeaf),
+        Assumptions,
+        SeedEq,
+        StateTerm,
+        InputSpec,
+        ModuleSpec)
+    =
+      deriveAffectedSetLD(
+        affectedEqsAfterSubstLD(Assumptions, SeedEq, StateTerm, StateForm),
+        SeedEq,
+        substStateEqLD(SeedEq, StateTerm, StateForm),
+        Gamma,
+        substAssumptionSetExceptSeedLD(Assumptions, SeedEq, StateTerm, StateForm),
+        addSymConstOpsForStateFormLD(
+          seedParseModuleLD(InputSpec, ModuleSpec),
+          StateForm)) .
+
+  eq derivedItemsBranchLD(Branch, Assumptions, SeedEq, StateTerm, InputSpec, ModuleSpec)
+    = emptyD [owise] .
+
+  --------------------------------------------------------------------------
+  --- Construct E[v/s].
+  ---
+  --- Definition:
+  ---
+  ---   E[v/s] = { e[v/s] | e in E \ {e_sd} }
+  ---
+  --- The seed equation e_sd is removed before substitution.
+  --------------------------------------------------------------------------
+  op substAssumptionSetExceptSeedLD : EquationSet Equation Term Term -> EquationSet .
+
+  eq substAssumptionSetExceptSeedLD(none, SeedEq, StateTerm, StateForm) = none .
+  eq substAssumptionSetExceptSeedLD(SeedEq Assumptions, SeedEq, StateTerm, StateForm)
+    = substAssumptionSetExceptSeedLD(Assumptions, SeedEq, StateTerm, StateForm) .
+  eq substAssumptionSetExceptSeedLD(Eq Assumptions, SeedEq, StateTerm, StateForm)
+    =
+      substStateEqLD(Eq, StateTerm, StateForm)
+      substAssumptionSetExceptSeedLD(Assumptions, SeedEq, StateTerm, StateForm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Construct Aff_{E[v/s]}.
+  ---
+  --- Definition:
+  ---
+  ---   Aff_{E[v/s]}
+  ---     = { e[v/s] | e[v/s] =/= e, e in E \ {e_sd} }
+  --------------------------------------------------------------------------
+  op affectedEqsAfterSubstLD : EquationSet Equation Term Term -> EquationSet .
+
+  eq affectedEqsAfterSubstLD(none, SeedEq, StateTerm, StateForm) = none .
+  eq affectedEqsAfterSubstLD(SeedEq Assumptions, SeedEq, StateTerm, StateForm)
+    = affectedEqsAfterSubstLD(Assumptions, SeedEq, StateTerm, StateForm) .
+  ceq affectedEqsAfterSubstLD(Eq Assumptions, SeedEq, StateTerm, StateForm)
+    =
+      substStateEqLD(Eq, StateTerm, StateForm)
+      affectedEqsAfterSubstLD(Assumptions, SeedEq, StateTerm, StateForm)
+    if substStateEqLD(Eq, StateTerm, StateForm) =/= Eq .
+  eq affectedEqsAfterSubstLD(Eq Assumptions, SeedEq, StateTerm, StateForm)
+    =
+      affectedEqsAfterSubstLD(Assumptions, SeedEq, StateTerm, StateForm)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Substitute v for s in one equation.
+  --------------------------------------------------------------------------
+  op substStateEqLD : Equation Term Term -> Equation .
+
+  eq substStateEqLD(eq LhsTerm = RhsTerm [Attrs] ., Term1, StateForm)
+    =
+      (eq replaceTermLD(LhsTerm, Term1, StateForm)
+          =
+          replaceTermLD(RhsTerm, Term1, StateForm)
+       [Attrs] .) .
+
+  --------------------------------------------------------------------------
+  --- Derive equations from affected equations.
+  --------------------------------------------------------------------------
+  op deriveAffectedSetLD : EquationSet Equation Equation GammaList EquationSet Module -> DerivedSet .
+  op deriveAffectedOneLD : Equation Equation Equation GammaList EquationSet Module -> DerivedSet .
+
+  eq deriveAffectedSetLD(none, SeedEq, SeedInstEq, Gamma, SubstAssumps, ProtocolMod)
+    = emptyD .
+
+  eq deriveAffectedSetLD(Eq Assumptions, SeedEq, SeedInstEq, Gamma, SubstAssumps, ProtocolMod)
+    =
+      deriveAffectedOneLD(Eq, SeedEq, SeedInstEq, Gamma, SubstAssumps, ProtocolMod)
+      +++
+      deriveAffectedSetLD(Assumptions, SeedEq, SeedInstEq, Gamma, SubstAssumps, ProtocolMod) .
+
+  --------------------------------------------------------------------------
+  --- Stepwise reduction under ordered Gamma
+  ---
+  --- Instead of adding the whole Gamma to Spec at once, we add Gamma equations
+  --- one by one, following their order in GammaList.
+  ---
+  --- For Gamma = g1 ;G g2 ;G ... ;G gn:
+  ---   t0 = reduce(t,  Spec + {g1})
+  ---   t1 = reduce(t0, Spec + {g1,g2})
+  ---   ...
+  ---   tn = reduce(tn-1, Spec + {g1,...,gn})
+  --------------------------------------------------------------------------
+  op reduceTermStepwiseGammaLD : Term Module GammaList -> Term .
+  op reduceTermStepwiseGammaAccLD : Term Module GammaList GammaList -> Term .
+
+  --- No Gamma: reduce under Spec only.
+  eq reduceTermStepwiseGammaLD(Term1, ProtocolMod, emptyG)
+    = reduceTermUnderGammaLD(Term1, ProtocolMod, none) .
+
+  --- Non-empty Gamma: reduce step by step.
+  eq reduceTermStepwiseGammaLD(Term1, ProtocolMod, Gamma)
+    = reduceTermStepwiseGammaAccLD(Term1, ProtocolMod, Gamma, emptyG)
+    [owise] .
+
+  --- No remaining Gamma equation: return the current reduced term.
+  eq reduceTermStepwiseGammaAccLD(Term1, ProtocolMod, emptyG, AccGamma)
+    = Term1 .
+
+  --- Remaining Gamma has exactly one equation.
+  eq reduceTermStepwiseGammaAccLD(
+        Term1,
+        ProtocolMod,
+        Eq,
+        AccGamma)
+    =
+      reduceTermUnderGammaLD(
+        Term1,
+        ProtocolMod,
+        gammaList2EqSetLD(AccGamma ;G Eq)) .
+
+  --- Remaining Gamma has at least two equations.
+  eq reduceTermStepwiseGammaAccLD(
+        Term1,
+        ProtocolMod,
+        Eq ;G RestGamma,
+        AccGamma)
+    =
+      reduceTermStepwiseGammaAccLD(
+        reduceTermUnderGammaLD(
+          Term1,
+          ProtocolMod,
+          gammaList2EqSetLD(AccGamma ;G Eq)),
+        ProtocolMod,
+        RestGamma,
+        AccGamma ;G Eq)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Derive one affected equation.
+  ---
+  --- For an affected equation:
+  ---
+  ---   e : lhs(e) = rhs(e)
+  ---
+  --- reduce lhs(e) under Spec and Gamma.
+  ---
+  --- If:
+  ---
+  ---   lhs(e) ->*_{S,Gamma} x''
+  ---
+  --- and x'' is a data value, create:
+  ---
+  ---   d : lhs(e) = x''
+  ---
+  --- The derived item stores:
+  ---
+  ---   e_sd, e_sd[v/s], Gamma, E[v/s], e, d
+  --------------------------------------------------------------------------
+  ceq deriveAffectedOneLD(
+        eq LhsTerm = RhsTerm [Attrs] .,
+        SeedEq,
+        SeedInstEq,
+        Gamma,
+        SubstAssumps,
+        ProtocolMod)
+    =
+      der(
+        SeedEq,
+        SeedInstEq,
+        Gamma,
+        SubstAssumps,
+        eq LhsTerm = RhsTerm [Attrs] .,
+        eq LhsTerm = Term1 [none] .)
+    if Term1 := reduceTermStepwiseGammaLD(LhsTerm, ProtocolMod, Gamma) 
+    /\ isDataValueLD(Term1) .
+
+  eq deriveAffectedOneLD(Eq, SeedEq, SeedInstEq, Gamma, SubstAssumps, ProtocolMod)
+    = emptyD [owise] .
+
+  --------------------------------------------------------------------------
+  --- Data-value check.
+  ---
+  --- We treat a data value as a constant normal form:
+  ---   true, false, cs, rs, ws, p, r, ...
+  ---
+  --- A term with arguments, such as pc(...), locked(...), queue(...),
+  --- is not treated as a data value.
+  --------------------------------------------------------------------------
+  op isDataValueLD : Term -> Bool .
+  
+  ceq isDataValueLD(LhsTerm)
+    = true
+    if LhsTerm :: Constant .
+  eq isDataValueLD(ModName[Terms]) = false .
+  eq isDataValueLD(LhsTerm) = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- Convert a DerivedSet into the EquationSet D.
+  --------------------------------------------------------------------------
+  op derivedEqSetLD : DerivedSet -> EquationSet .
+
+  eq derivedEqSetLD(emptyD) = none .
+  eq derivedEqSetLD(
+        der(SeedEq, SeedInstEq, Gamma, SubstAssumps, Eq, Eq2) +++ DerItems)
+    = Eq2 derivedEqSetLD(DerItems) .
+  eq derivedEqSetLD(der(SeedEq, SeedInstEq, Gamma, SubstAssumps, Eq, Eq2))
+    = Eq2 .
+
+  --------------------------------------------------------------------------
+  --- Print derived equations.
+  --------------------------------------------------------------------------
+  op derivedSet2StrLD : DerivedSet -> String .
+  op derivedItem2StrLD : DerivedItem -> String .
+  op noneIfEmptyDerivedLD : String -> String .
+
+  eq derivedSet2StrLD(emptyD) = "" .
+  eq derivedSet2StrLD(DerItem +++ DerItems)
+    =
+      derivedItem2StrLD(DerItem)
+      + derivedSet2StrLD(DerItems) .
+  eq derivedItem2StrLD(
+        der(SeedEq, SeedInstEq, Gamma, SubstAssumps, Eq, eq LhsTerm = RhsTerm [Attrs] .))
+    =
+      "  eq "
+      + term2StrLD(LhsTerm)
+      + " = "
+      + term2StrLD(RhsTerm)
+      + " .\n" .
+
+  eq noneIfEmptyDerivedLD("") = "  (none)\n" .
+  eq noneIfEmptyDerivedLD(InputStr) = InputStr [owise] .
+
+endm
+
+--------------------------------------------------------------------------
+--- Module for candidate lemmas.
+--------------------------------------------------------------------------
+mod LD-CANDIDATE is
+  pr LD-DERIVE .
+
+  var ObserverName OpName ModName : Qid .
+
+  vars InputStr InputStr2 : String .
+
+  vars InputSpec : IPSGInputSpec .
+  var ModuleSpec : IPSGModuleSpec .
+  var ProofScore : IPSGProofScore .
+  var ProofScoreList : PrscList .
+  var ProofScores : IPSGProofScores .
+  var ProtocolMod : Module .
+
+  vars Attrs Attrs2 Attrs3 : AttrSet .
+
+  vars Eq Eq2 : Equation .
+  vars SeedEq SeedInstEq : Equation .
+  var Gamma : GammaList .
+  var SubstAssumps : EquationSet .
+
+  vars LhsTerm RhsTerm : Term .
+  vars Term2 OriginalRhs DerivedRhs : Term .
+  vars StateTerm StateForm ObsArg TargetValue : Term .
+  vars Lhs1 Rhs1 Lhs2 Rhs2 : Term .
+  vars SeedDiffTerm BranchDiffTerm : Term .
+  vars AntLhs AntRhs : Term .   --- for antecedent after generalization
+
+  vars T1 T2 Term1 : Term .
+  vars TL1 TL2 : TermList .
+  vars Terms1 Terms2 : TermList .
+
+  var DerItem : DerivedItem .
+  vars DerItems DerItems2 : DerivedSet .
+
+  var Imports : ImportList .
+  var Sorts : SortSet .
+  var SubsortDecls : SubsortDeclSet .
+  vars OpDecls : OpDeclSet .
+  var MembAxs : MembAxSet .
+  vars EQs : EquationSet .
+
+  vars ParamName ParamSortName qName : Qid .
+  vars Sort : Type .
+  vars Params : ParamList .
+  vars N : Nat .
+
+  vars OldTerms NewTerms AllTerms : TermList .
+  vars NameStr TypeStr : String .
+  var LmNo : Nat .
+  var FreshLmNo : Nat .
+  var LmName : Qid .
+
+  var InvTarget : InvariantTarget .
+  var InvTargets : InvTargetList .
+  
+  --------------------------------------------------------------------------
+  --- candidate lemmas of <seed-equation> by <proof-score-id>
+  ---
+  --- A derived equation d is turned into a candidate lemma only if it
+  --- produces a contradiction with the original right-hand side of the
+  --- affected equation.
+  ---
+  --- For:
+  ---
+  ---   e : lhs(e) = rhs(e)
+  ---   d : lhs(e) = x''
+  ---
+  --- we check whether:
+  ---
+  ---   x'' = rhs(e)
+  ---
+  --- reduces to false under:
+  ---
+  ---   Spec, D, Gamma, E[v/s] \ {e}
+  ---
+  --- If yes, we produce:
+  ---
+  ---   branch-level:  e_sd[v/s] ==> d
+  ---   generalized:   gen_v(e_sd[v/s] ==> d)
+  --------------------------------------------------------------------------
+  op candidateLemmasOfSeedByIdStrLD : IPSGInputSpec IPSGModuleSpec IPSGProofScores String String -> String .
+  op candidateLemmasOfSeedFoundStrLD : IPSGInputSpec IPSGModuleSpec PrscList Equation String String -> String .
+  op candidateLemmasOfSeedPrscStrLD : IPSGInputSpec IPSGModuleSpec IPSGProofScore Equation String -> String .
+  op noneIfEmptyLemmasLD : String -> String .
+
+  ceq candidateLemmasOfSeedByIdStrLD(InputSpec, ModuleSpec, ProofScores, InputStr, InputStr2)
+    =
+      "Protocol: " + string(getInputSpecMod(InputSpec)) + "\n" +
+      "Seed equation: " + InputStr + "\n" +
+      candidateLemmasOfSeedFoundStrLD(
+        InputSpec,
+        ModuleSpec,
+        findProofScoreByIdLD(getPrscList(ProofScores), normalizePsIdString(InputStr2)),
+        parseSeedEqLD(InputStr, ProtocolMod),
+        normalizePsIdString(InputStr2),
+        InputStr)
+    if ProtocolMod := seedParseModuleLD(InputSpec, ModuleSpec) .
+
+  eq candidateLemmasOfSeedFoundStrLD(InputSpec, ModuleSpec, (nil).PrscList, SeedEq, InputStr, InputStr2)
+    =
+      "No proof score with ID " + normalizePsIdString(InputStr)
+      + " in protocol " + string(getInputSpecMod(InputSpec)) + ".\n" .
+
+  eq candidateLemmasOfSeedFoundStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr, InputStr2)
+    = candidateLemmasOfSeedPrscStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr2) .
+
+  ceq candidateLemmasOfSeedPrscStrLD(InputSpec, ModuleSpec, ProofScore, SeedEq, InputStr)
+    =
+      "Proof score ID: " + psId2String(getPrscId(ProofScore)) + "\n" +
+      "Candidate lemmas:\n" +
+      noneIfEmptyLemmasLD(
+        candidateLemmasFromDerSetLD(
+          DerItems2,
+          DerItems2,
+          InputSpec,
+          ModuleSpec,
+          ProofScore))
+      +
+      "Candidate lemma equation set:\n" +
+      noneIfEmptyLemmasLD(
+        lemmaEqSet2StrLD(
+          candidateLemmaEqSetFromDerSetLD(
+            DerItems2,
+            DerItems2,
+            InputSpec,
+            ModuleSpec,
+            ProofScore,
+            1)))
+    if DerItems2 := derivedItemsFromSeedLD(SeedEq, InputSpec, ModuleSpec, ProofScore) .
+
+  --------------------------------------------------------------------------
+  --- Iterate over derived equations.
+  ---
+  --- First argument : remaining derived items to inspect.
+  --- Second argument: full D, needed for contradiction checking.
+  --------------------------------------------------------------------------
+  op candidateLemmasFromDerSetLD : DerivedSet DerivedSet IPSGInputSpec IPSGModuleSpec IPSGProofScore -> String .
+  op candidateLemmaFromDerLD : DerivedItem DerivedSet IPSGInputSpec IPSGModuleSpec IPSGProofScore -> String .
+
+  eq candidateLemmasFromDerSetLD(emptyD, DerItems, InputSpec, ModuleSpec, ProofScore) = "" .
+
+  eq candidateLemmasFromDerSetLD(DerItem +++ DerItems, DerItems2, InputSpec, ModuleSpec, ProofScore)
+    = candidateLemmaFromDerLD(DerItem, DerItems2, InputSpec, ModuleSpec, ProofScore)
+      + candidateLemmasFromDerSetLD(DerItems, DerItems2, InputSpec, ModuleSpec, ProofScore) .
+
+  eq candidateLemmasFromDerSetLD(DerItem, DerItems2, InputSpec, ModuleSpec, ProofScore)
+    = candidateLemmaFromDerLD(DerItem, DerItems2, InputSpec, ModuleSpec, ProofScore)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Add proof-score operations to the protocol module.
+  --------------------------------------------------------------------------
+  op addProofScoreOpsLD : Module IPSGProofScore -> Module .
+
+  eq addProofScoreOpsLD(
+      fth ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EQs endfth,
+      ProofScore)
+    =
+      fth ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls getOps(getPrscModule(ProofScore))
+        MembAxs
+        EQs
+      endfth .
+
+  eq addProofScoreOpsLD(
+      fmod ModName is Imports sorts Sorts . SubsortDecls OpDecls MembAxs EQs endfm,
+      ProofScore)
+    =
+      fmod ModName is
+        Imports
+        sorts Sorts .
+        SubsortDecls
+        OpDecls getOps(getPrscModule(ProofScore))
+        MembAxs
+        EQs
+      endfm .
+
+  --------------------------------------------------------------------------
+  --- Generate a candidate lemma from one derived equation.
+  ---
+  --- Given:
+  ---
+  ---   e : lhs(e) = rhs(e)
+  ---   d : lhs(e) = x''
+  ---
+  --- we check:
+  ---
+  ---   x'' = rhs(e) ->*_{S,D,Gamma,E[v/s]\{e}} false
+  ---
+  --- If the check succeeds, produce:
+  ---
+  ---   branch-level: e_sd[v/s] ==> d
+  ---   generalized : gen_v(e_sd[v/s] ==> d)
+  --------------------------------------------------------------------------
+  ceq candidateLemmaFromDerLD(
+        der(
+          SeedEq,
+          SeedInstEq,
+          Gamma,
+          SubstAssumps,
+          eq Term2 = OriginalRhs [Attrs] .,
+          eq Term2 = DerivedRhs [none] .),
+        DerItems,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    =
+      "  Branch-level:\n"
+      + branchLevelLemmaStrLD(
+          SeedInstEq,
+          eq Term2 = DerivedRhs [none] .)
+      + "  Generalized:\n"
+      + generalizedLemmaStrLD(
+          SeedEq,
+          SeedInstEq,
+          eq Term2 = DerivedRhs [none] .,
+          InputSpec)
+    if contradictionCheckLD(
+         eq Term2 = OriginalRhs [Attrs] .,
+         eq Term2 = DerivedRhs [none] .,
+         DerItems,
+         Gamma,
+         SubstAssumps,
+         addSymConstOpsForStateFormLD(
+           addProofScoreOpsLD(
+             seedParseModuleLD(InputSpec, ModuleSpec),
+             ProofScore),
+           branchDiffTermLD(SeedEq, SeedInstEq))) .
+  eq candidateLemmaFromDerLD(DerItem, DerItems, InputSpec, ModuleSpec, ProofScore) = "" [owise] .
+
+  --------------------------------------------------------------------------
+  --- Contradiction check.
+  ---
+  --- affected equation:
+  ---   e : lhs(e) = rhs(e)
+  ---
+  --- derived equation:
+  ---   d : lhs(e) = x''
+  ---
+  --- We reduce:
+  ---
+  ---   x'' = rhs(e)
+  ---
+  --- under:
+  ---
+  ---   Spec, D, Gamma, E[v/s] \ {e}
+  --------------------------------------------------------------------------
+  op contradictionCheckLD : Equation Equation DerivedSet GammaList EquationSet Module -> Bool .
+  
+  ceq contradictionCheckLD(
+        eq Term2 = OriginalRhs [Attrs] .,
+        eq Term2 = DerivedRhs [none] .,
+        DerItems,
+        Gamma,
+        SubstAssumps,
+        ProtocolMod)
+    =
+      true
+    if reduceEqBoolUnderGammaLD(
+         eq DerivedRhs = OriginalRhs [none] .,
+         ProtocolMod,
+         derivedEqSetLD(DerItems)
+         gammaList2EqSetLD(Gamma)
+         eqSetMinusLD(SubstAssumps, eq Term2 = OriginalRhs [Attrs] .))
+       == 'false.Bool .
+  eq contradictionCheckLD(Eq, Eq2, DerItems, Gamma, SubstAssumps, ProtocolMod)
+    = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- Branch-level candidate lemma.
+  ---
+  ---   e_sd[v/s] ==> d
+  --------------------------------------------------------------------------
+  op branchLevelLemmaStrLD : Equation Equation -> String .
+
+  eq branchLevelLemmaStrLD(
+      eq LhsTerm = RhsTerm [Attrs] .,
+      eq Term2 = DerivedRhs [Attrs2] .)
+    =
+      "    "
+      + term2StrLD(LhsTerm) + " = " + term2StrLD(RhsTerm)
+      + "  ==>  "
+      + term2StrLD(Term2) + " = " + term2StrLD(DerivedRhs)
+      + "\n" .
+
+  --------------------------------------------------------------------------
+  --- Generalized candidate lemma.
+  ---
+  --- SeedEq:
+  ---   original seed equation e_sd
+  ---
+  --- SeedInstEq:
+  ---   branch-level seed instance e_sd[v/s]
+  ---
+  --- Derived equation:
+  ---   lhs(e) = x''
+  ---
+  --- The symbolic state form v is replaced by the original state constant
+  --- appearing in the seed equation. This avoids hard-coding Sys/Pid.
+  --------------------------------------------------------------------------
+  op generalizedLemmaStrLD : Equation Equation Equation IPSGInputSpec -> String .
+
+  op noGenTermLD : -> Term .
+  op seedDiffTermLD : Equation Equation -> Term .
+  op branchDiffTermLD : Equation Equation -> Term .
+  op seedDiffInTermLD : Term Term -> Term .
+  op branchDiffInTermLD : Term Term -> Term .
+  op seedDiffInTermListLD : TermList TermList -> Term .
+  op branchDiffInTermListLD : TermList TermList -> Term .
+  op isNoGenTermLD : Term -> Bool .
+  op isInitialStateFormLD : Term -> Bool .
+
+  eq noGenTermLD = qid("$noGenTerm.Bool") .
+  eq isNoGenTermLD(noGenTermLD) = true .
+  eq isNoGenTermLD(Term2) = false [owise] .
+
+  --- A symbolic state form is treated as initial if it is a constant
+  --- such as init.Sys.  Transition state forms such as try(s0.Sys,p1.Pid)
+  --- are operator applications, so they are not initial.
+  ceq isInitialStateFormLD(Term1)
+    = true
+    if Term1 :: Constant
+    /\ not isGeneratedStateConstLD(Term1) .
+
+  eq isInitialStateFormLD(Term1)
+    = false [owise] .
+
+  ceq seedDiffTermLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .)
+    = seedDiffInTermLD(Lhs1, Lhs2)
+    if not isNoGenTermLD(seedDiffInTermLD(Lhs1, Lhs2)) .
+
+  eq seedDiffTermLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .)
+    = seedDiffInTermLD(Rhs1, Rhs2) [owise] .
+
+  ceq branchDiffTermLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .)
+    = branchDiffInTermLD(Lhs1, Lhs2)
+    if not isNoGenTermLD(seedDiffInTermLD(Lhs1, Lhs2)) .
+
+  eq branchDiffTermLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .)
+    = branchDiffInTermLD(Rhs1, Rhs2) [owise] .
+
+  ceq seedDiffInTermLD(Term1, Term2)
+    = noGenTermLD
+    if Term1 == Term2 .
+
+  eq seedDiffInTermLD(OpName[Terms1], OpName[Terms2])
+    = seedDiffInTermListLD(Terms1, Terms2) .
+
+  eq seedDiffInTermLD(Term1, Term2)
+    = Term1 [owise] .
+
+  ceq branchDiffInTermLD(Term1, Term2)
+    = noGenTermLD if Term1 == Term2 .
+
+  eq branchDiffInTermLD(OpName[Terms1], OpName[Terms2])
+    = branchDiffInTermListLD(Terms1, Terms2) .
+
+  eq branchDiffInTermLD(Term1, Term2)
+    = Term2 [owise] .
+
+  eq seedDiffInTermListLD(empty, empty)
+    = noGenTermLD .
+
+  ceq seedDiffInTermListLD((T1 , TL1), (T2 , TL2))
+    = seedDiffInTermLD(T1, T2)
+    if not isNoGenTermLD(seedDiffInTermLD(T1, T2)) .
+
+  eq seedDiffInTermListLD((T1 , TL1), (T2 , TL2))
+    = seedDiffInTermListLD(TL1, TL2) [owise] .
+
+  eq seedDiffInTermListLD(T1, T2)
+    = seedDiffInTermLD(T1, T2) [owise] .
+
+  eq branchDiffInTermListLD(empty, empty)
+    = noGenTermLD .
+
+  ceq branchDiffInTermListLD((T1 , TL1), (T2 , TL2))
+    = branchDiffInTermLD(T1, T2)
+    if not isNoGenTermLD(seedDiffInTermLD(T1, T2)) .
+
+  eq branchDiffInTermListLD((T1 , TL1), (T2 , TL2))
+    = branchDiffInTermListLD(TL1, TL2)
+    [owise] .
+
+  eq branchDiffInTermListLD(T1, T2)
+    = branchDiffInTermLD(T1, T2) [owise] .
+
+  ceq generalizedLemmaStrLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .,
+        eq LhsTerm = RhsTerm [Attrs3] .,
+        InputSpec)
+    =
+        "    "
+        + term2StrLD(replaceManyLD(AntLhs, OldTerms, NewTerms))
+        + " = "
+        + term2StrLD(replaceManyLD(AntRhs, OldTerms, NewTerms))
+        + "  ==>  "
+        + term2StrLD(replaceManyLD(T1, OldTerms, NewTerms))
+        + " = "
+        + term2StrLD(replaceManyLD(T2, OldTerms, NewTerms))
+        + "\n"
+    if SeedDiffTerm :=
+        seedDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ BranchDiffTerm :=
+        branchDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ AntLhs :=
+        generalizeTermBySeedLD(
+          Lhs2,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ AntRhs :=
+        generalizeTermBySeedLD(
+          Rhs2,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ not isNoGenTermLD(SeedDiffTerm)
+    /\ not isNoGenTermLD(BranchDiffTerm)
+    /\ T1 :=
+        generalizeTermBySeedLD(
+          LhsTerm,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ T2 :=
+        generalizeTermBySeedLD(
+          RhsTerm,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ OldTerms :=
+        lemmaParamConstsFromTermsForBranchLD(
+          AntLhs,
+          AntRhs,
+          T1,
+          T2,
+          firstTargetParamsLD(getInputSpecInvsTarget(InputSpec)),
+          BranchDiffTerm)
+    /\ NewTerms :=
+        lemmaVarTermsFromConstTermsLD(OldTerms) .
+
+  eq generalizedLemmaStrLD(Eq, Eq2, SeedInstEq, InputSpec)
+    = "    (unsupported generalization form)\n" [owise] .
+
+  --------------------------------------------------------------------------
+  --- Replace the branch-specific symbolic state form by the original seed-side
+  --- state term.
+  --------------------------------------------------------------------------
+  op generalizeTermBySeedLD : Term Term Term -> Term .
+
+  --- If the branch state form is an initial state such as init.Sys,
+  --- keep it unchanged.
+  ceq generalizeTermBySeedLD(Term1, StateForm, StateTerm)
+    = Term1
+    if isInitialStateFormLD(StateForm) .
+
+  --- Otherwise, replace the branch-specific state form by the seed-side state.
+  eq generalizeTermBySeedLD(Term1, StateForm, StateTerm)
+    = replaceTermLD(Term1, StateForm, StateTerm)
+    [owise] .
+
+  eq noneIfEmptyLemmasLD("") = "  (none)\n" .
+  eq noneIfEmptyLemmasLD(InputStr) = InputStr [owise] .
+
+  --------------------------------------------------------------------------
+  --- Build the equation set of generalized candidate lemmas.
+  --------------------------------------------------------------------------
+
+  --------------------------------------------------------------------------
+  --- Candidate lemma equation set.
+  --- Each generalized lemma is stored as:
+  ---   eq lmN(Vars) = (antecedent implies consequent) .
+  --------------------------------------------------------------------------
+  op candidateLemmaEqSetFromDerSetLD : DerivedSet DerivedSet IPSGInputSpec IPSGModuleSpec IPSGProofScore Nat -> EquationSet .
+  op candidateLemmaEqFromDerLD : Nat DerivedItem DerivedSet IPSGInputSpec IPSGModuleSpec IPSGProofScore -> EquationSet .
+  op isCandidateLemmaDerLD : DerivedItem DerivedSet IPSGInputSpec IPSGModuleSpec IPSGProofScore -> Bool .
+  op isGeneralizableLemmaLD : Equation Equation -> Bool .
+  op generalizedLemmaEqLD : Nat Equation Equation Equation IPSGInputSpec -> Equation .
+
+  --- Check and skip lemma names already used by invariant targets.
+  op invTargetNameExistsLD : Qid InvTargetList -> Bool .
+  op freshLemmaNoLD : Nat InvTargetList -> Nat .
+
+  eq candidateLemmaEqSetFromDerSetLD(
+        emptyD,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore,
+        LmNo)
+    = none .
+
+  ceq candidateLemmaEqSetFromDerSetLD(
+        DerItem +++ DerItems,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore,
+        LmNo)
+    = candidateLemmaEqFromDerLD(
+        FreshLmNo,
+        DerItem,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+      candidateLemmaEqSetFromDerSetLD(
+        DerItems,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore,
+        incLD(FreshLmNo))
+    if FreshLmNo :=
+         freshLemmaNoLD(
+           LmNo,
+           getInputSpecInvsTarget(InputSpec))
+    /\ isCandidateLemmaDerLD(DerItem, DerItems2, InputSpec, ModuleSpec, ProofScore) .
+
+  ceq candidateLemmaEqSetFromDerSetLD(
+        DerItem,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore,
+        LmNo)
+    = candidateLemmaEqFromDerLD(
+        FreshLmNo,
+        DerItem,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    if FreshLmNo :=
+         freshLemmaNoLD(
+           LmNo,
+           getInputSpecInvsTarget(InputSpec)) .
+
+  eq candidateLemmaEqSetFromDerSetLD(
+        DerItem,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore,
+        LmNo)
+    = candidateLemmaEqFromDerLD(
+        LmNo,
+        DerItem,
+        DerItems2,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    [owise] .
+
+  ceq candidateLemmaEqFromDerLD(
+        LmNo,
+        der(
+          SeedEq,
+          SeedInstEq,
+          Gamma,
+          SubstAssumps,
+          eq Term2 = OriginalRhs [Attrs] .,
+          eq Term2 = DerivedRhs [none] .),
+        DerItems,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    = generalizedLemmaEqLD(
+        LmNo,
+        SeedEq,
+        SeedInstEq,
+        eq Term2 = DerivedRhs [none] .,
+        InputSpec)
+    if isCandidateLemmaDerLD(
+         der(
+           SeedEq,
+           SeedInstEq,
+           Gamma,
+           SubstAssumps,
+           eq Term2 = OriginalRhs [Attrs] .,
+           eq Term2 = DerivedRhs [none] .),
+         DerItems,
+         InputSpec,
+         ModuleSpec,
+         ProofScore) .
+
+  eq candidateLemmaEqFromDerLD(
+        LmNo,
+        DerItem,
+        DerItems,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    = none [owise] .
+
+  ceq isCandidateLemmaDerLD(
+        der(
+          SeedEq,
+          SeedInstEq,
+          Gamma,
+          SubstAssumps,
+          eq Term2 = OriginalRhs [Attrs] .,
+          eq Term2 = DerivedRhs [none] .),
+        DerItems,
+        InputSpec,
+        ModuleSpec,
+        ProofScore)
+    = true
+    if contradictionCheckLD(
+         eq Term2 = OriginalRhs [Attrs] .,
+         eq Term2 = DerivedRhs [none] .,
+         DerItems,
+         Gamma,
+         SubstAssumps,
+         addSymConstOpsForStateFormLD(
+           addProofScoreOpsLD(
+             seedParseModuleLD(InputSpec, ModuleSpec),
+             ProofScore),
+           branchDiffTermLD(SeedEq, SeedInstEq))) 
+    /\ isGeneralizableLemmaLD(SeedEq, SeedInstEq) .
+
+  eq isCandidateLemmaDerLD(DerItem, DerItems, InputSpec, ModuleSpec, ProofScore)
+    = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- Check whether the seed instance can be generalized.
+  --------------------------------------------------------------------------
+  ceq isGeneralizableLemmaLD(
+        eq Lhs1 = Rhs1 [Attrs] .,
+        eq Lhs2 = Rhs2 [Attrs2] .)
+    = true
+    if SeedDiffTerm :=
+        seedDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ BranchDiffTerm :=
+        branchDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ not isNoGenTermLD(SeedDiffTerm)
+    /\ not isNoGenTermLD(BranchDiffTerm) .
+
+  eq isGeneralizableLemmaLD(Eq, Eq2) = false [owise] .
+
+  --------------------------------------------------------------------------
+  --- Lemma name and LHS application: lm1(S,P), lm2(S,P1,P2), ...
+  --------------------------------------------------------------------------
+  op lemmaNameLD : Nat -> Qid .
+  op lemmaAppTermLD : Nat TermList -> Term .
+
+  eq lemmaNameLD(LmNo)
+    = qid("lm" + string(LmNo, 10)) .
+
+  eq lemmaAppTermLD(LmNo, NewTerms)
+    = lemmaNameLD(LmNo)[NewTerms] .
+
+  --------------------------------------------------------------------------
+  --- Fresh lemma number wrt existing invariant target names.
+  ---
+  --- If lmN already appears as getInvName(...) in InputSpec,
+  --- skip N until a fresh qid is found.
+  --------------------------------------------------------------------------
+  eq invTargetNameExistsLD(LmName, (nil).InvTargetList)
+    = false .
+
+  ceq invTargetNameExistsLD(LmName, InvTarget InvTargets)
+    = true
+    if LmName == getInvName(InvTarget) .
+
+  eq invTargetNameExistsLD(LmName, InvTarget InvTargets)
+    = invTargetNameExistsLD(LmName, InvTargets) [owise] .
+
+  ceq freshLemmaNoLD(LmNo, InvTargets)
+    = freshLemmaNoLD(incLD(LmNo), InvTargets)
+    if invTargetNameExistsLD(lemmaNameLD(LmNo), InvTargets) .
+
+  eq freshLemmaNoLD(LmNo, InvTargets)
+    = LmNo [owise] .
+
+  --------------------------------------------------------------------------
+  --- Build one stored lemma equation.
+  --------------------------------------------------------------------------
+  ceq generalizedLemmaEqLD(
+        LmNo,
+        eq Lhs1 = Rhs1 [Attrs] ., --- seed eq e_sd
+        eq Lhs2 = Rhs2 [Attrs2] ., --- seed instance eq e_sd[v/s]
+        eq LhsTerm = RhsTerm [Attrs3] ., --- derived equation
+        InputSpec)
+    =
+      eq lemmaAppTermLD(LmNo, NewTerms)
+       =
+         '_implies_[
+           '_=_[
+             replaceManyLD(AntLhs, OldTerms, NewTerms),
+             replaceManyLD(AntRhs, OldTerms, NewTerms)],
+           '_=_[
+             replaceManyLD(T1, OldTerms, NewTerms),
+             replaceManyLD(T2, OldTerms, NewTerms)]]
+      [none] .
+    if SeedDiffTerm :=
+        seedDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ BranchDiffTerm :=
+        branchDiffTermLD(
+          eq Lhs1 = Rhs1 [Attrs] .,
+          eq Lhs2 = Rhs2 [Attrs2] .)
+    /\ AntLhs :=
+        generalizeTermBySeedLD(
+          Lhs2,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ AntRhs :=
+        generalizeTermBySeedLD(
+          Rhs2,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ not isNoGenTermLD(SeedDiffTerm)
+    /\ not isNoGenTermLD(BranchDiffTerm)
+    /\ T1 :=
+        generalizeTermBySeedLD(
+          LhsTerm,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ T2 :=
+        generalizeTermBySeedLD(
+          RhsTerm,
+          BranchDiffTerm,
+          SeedDiffTerm)
+    /\ OldTerms :=
+        lemmaParamConstsFromTermsForBranchLD(
+          AntLhs,
+          AntRhs,
+          T1,
+          T2,
+          firstTargetParamsLD(getInputSpecInvsTarget(InputSpec)),
+          BranchDiffTerm)
+    /\ NewTerms :=
+        lemmaVarTermsFromConstTermsLD(OldTerms) .
+
+  --------------------------------------------------------------------------
+  --- Collect constants whose sort appears in invariant parameters.
+  --------------------------------------------------------------------------
+  op lemmaParamConstsFromTermsLD : Term Term Term Term ParamList -> TermList .
+  op lemmaParamConstsFromTermsForBranchLD : Term Term Term Term ParamList Term -> TermList .
+  op removeTermFromTLLD : TermList Term -> TermList .
+
+
+  op addParamConstsTermLD : Term ParamList TermList -> TermList .
+  op addParamConstsTLLD : TermList ParamList TermList -> TermList .
+  op addParamConstIfNeededLD : Term ParamList TermList -> TermList .
+
+  op appendTermTLLD : TermList Term -> TermList .
+  op occursTermInTLLD : Term TermList -> Bool .
+
+  op isParamSortConstLD : Term ParamList -> Bool .
+  op paramSortExistsLD : Qid ParamList -> Bool .
+  op constSortFromConstLD : Term -> Type .
+
+  op lemmaVarTermsFromConstTermsLD : TermList -> TermList .
+  op lemmaVarTermsFromConstTermsAuxLD : TermList TermList -> TermList .
+  op lemmaVarTermForConstLD : Term TermList -> Term .
+  op lemmaVarNameForConstLD : Term TermList -> String .
+
+  op countConstSortInTLLD : Term TermList -> Nat .
+  op indexConstSortBeforeInTLLD : Term TermList -> Nat .
+  op sortFirstLetterUpperLD : Type -> String .
+
+  eq lemmaParamConstsFromTermsLD(T1, T2, Term1, Term2, Params)
+    = addParamConstsTermLD(
+        Term2,
+        Params,
+        addParamConstsTermLD(
+          Term1,
+          Params,
+          addParamConstsTermLD(
+            T2,
+            Params,
+            addParamConstsTermLD(T1, Params, empty)))) .
+
+  --- Collect constants for lemma variables, but if the branch state form
+  --- is an initial state, remove that initial state constant from the list.
+  ceq lemmaParamConstsFromTermsForBranchLD(T1, T2, Term1, Term2, Params, BranchDiffTerm)
+    = removeTermFromTLLD(
+        lemmaParamConstsFromTermsLD(T1, T2, Term1, Term2, Params),
+        BranchDiffTerm)
+    if isInitialStateFormLD(BranchDiffTerm) .
+  eq lemmaParamConstsFromTermsForBranchLD(T1, T2, Term1, Term2, Params, BranchDiffTerm)
+    = lemmaParamConstsFromTermsLD(T1, T2, Term1, Term2, Params)
+    [owise] .
+
+  eq removeTermFromTLLD(empty, Term1) = empty .
+  ceq removeTermFromTLLD(Term1, Term2)
+    = empty if Term1 == Term2 .
+  eq removeTermFromTLLD(Term1, Term2)
+    = Term1 [owise] .
+  ceq removeTermFromTLLD((T1 , TL1), Term1)
+    = removeTermFromTLLD(TL1, Term1)
+    if T1 == Term1 .
+  eq removeTermFromTLLD((T1 , TL1), Term1)
+    = T1, removeTermFromTLLD(TL1, Term1) [owise] .
+
+  eq addParamConstsTermLD(OpName[Terms1], Params, OldTerms)
+    = addParamConstsTLLD(Terms1, Params, OldTerms) .
+
+  eq addParamConstsTermLD(Term1, Params, OldTerms)
+    = addParamConstIfNeededLD(Term1, Params, OldTerms)
+    [owise] .
+
+  eq addParamConstsTLLD(empty, Params, OldTerms)
+    = OldTerms .
+
+  eq addParamConstsTLLD((Term1 , Terms1), Params, OldTerms)
+    = addParamConstsTLLD(
+        Terms1,
+        Params,
+        addParamConstsTermLD(Term1, Params, OldTerms)) .
+
+  eq addParamConstsTLLD(Term1, Params, OldTerms)
+    = addParamConstsTermLD(Term1, Params, OldTerms)
+    [owise] .
+
+  ceq addParamConstIfNeededLD(Term1, Params, OldTerms)
+    = appendTermTLLD(OldTerms, Term1)
+    if isParamSortConstLD(Term1, Params)
+    /\ not occursTermInTLLD(Term1, OldTerms) .
+
+  eq addParamConstIfNeededLD(Term1, Params, OldTerms)
+    = OldTerms [owise] .
+
+  eq appendTermTLLD(empty, Term1) = Term1 .
+
+  eq appendTermTLLD((T1 , TL1), Term1)
+    = T1,
+      appendTermTLLD(TL1, Term1) .
+
+  eq appendTermTLLD(T1, Term1)
+    = T1,
+      Term1
+    [owise] .
+
+  eq occursTermInTLLD(Term1, empty) = false .
+
+  ceq occursTermInTLLD(Term1, Term2)
+    = true
+    if Term1 == Term2 .
+
+  ceq occursTermInTLLD(Term1, (Term2 , Terms1))
+    = true
+    if Term1 == Term2 .
+
+  eq occursTermInTLLD(Term1, (Term2 , Terms1))
+    = occursTermInTLLD(Term1, Terms1)
+    [owise] .
+
+  eq occursTermInTLLD(Term1, Term2)
+    = false [owise] .
+
+  ceq isParamSortConstLD(qName, Params)
+    = true
+    if qName :: Constant
+    /\ paramSortExistsLD(constSortFromConstLD(qName), Params) .
+
+  eq isParamSortConstLD(Term1, Params) = false [owise] .
+
+  eq paramSortExistsLD(Sort, (nil).ParamList) = false .
+
+  eq paramSortExistsLD(Sort, param(ParamName, Sort) Params) = true .
+
+  eq paramSortExistsLD(Sort, param(ParamName, ParamSortName) Params)
+    = paramSortExistsLD(Sort, Params)
+    [owise] .
+
+  ceq constSortFromConstLD(qName)
+    = qid(typeSuffixLD(string(qName)))
+    if qName :: Constant .
+
+  --------------------------------------------------------------------------
+  --- Convert collected constants to variables by sort:
+  ---   one Sys  -> S:Sys
+  ---   one Pid  -> P:Pid
+  ---   two Pid  -> P1:Pid, P2:Pid
+  --------------------------------------------------------------------------
+  eq sortFirstLetterUpperLD(Sort)
+    = toUpperCase(substr(string(Sort), 0, 1)) .
+
+  eq lemmaVarTermsFromConstTermsLD(empty) = empty .
+
+  eq lemmaVarTermsFromConstTermsLD(OldTerms)
+    = lemmaVarTermsFromConstTermsAuxLD(OldTerms, OldTerms)
+    [owise] .
+
+  eq lemmaVarTermsFromConstTermsAuxLD(empty, AllTerms)
+    = empty .
+
+  eq lemmaVarTermsFromConstTermsAuxLD((Term1 , Terms1), AllTerms)
+    = lemmaVarTermForConstLD(Term1, AllTerms),
+      lemmaVarTermsFromConstTermsAuxLD(Terms1, AllTerms) .
+
+  eq lemmaVarTermsFromConstTermsAuxLD(Term1, AllTerms)
+    = lemmaVarTermForConstLD(Term1, AllTerms)
+    [owise] .
+
+  eq lemmaVarTermForConstLD(Term1, AllTerms)
+    =
+      qid(
+        lemmaVarNameForConstLD(Term1, AllTerms)
+        + ":"
+        + typeSuffixLD(string(Term1))) .
+
+  ceq lemmaVarNameForConstLD(Term1, AllTerms)
+    =
+      sortFirstLetterUpperLD(constSortFromConstLD(Term1))
+      + string(s(indexConstSortBeforeInTLLD(Term1, AllTerms)), 10)
+    if 1 < countConstSortInTLLD(Term1, AllTerms) .
+
+  eq lemmaVarNameForConstLD(Term1, AllTerms)
+    = sortFirstLetterUpperLD(constSortFromConstLD(Term1))
+    [owise] .
+
+  eq countConstSortInTLLD(Term1, empty) = 0 .
+
+  ceq countConstSortInTLLD(Term1, (Term2 , Terms1))
+    = s(countConstSortInTLLD(Term1, Terms1))
+    if sameConstSortLD(Term1, Term2) .
+
+  eq countConstSortInTLLD(Term1, (Term2 , Terms1))
+    = countConstSortInTLLD(Term1, Terms1)
+    [owise] .
+
+  ceq countConstSortInTLLD(Term1, Term2)
+    = 1 if sameConstSortLD(Term1, Term2) .
+
+  eq countConstSortInTLLD(Term1, Term2) = 0 [owise] .
+
+  eq indexConstSortBeforeInTLLD(Term1, empty) = 0 .
+
+  ceq indexConstSortBeforeInTLLD(Term1, (Term2 , Terms1))
+    = 0 if Term1 == Term2 .
+
+  ceq indexConstSortBeforeInTLLD(Term1, (Term2 , Terms1))
+    = s(indexConstSortBeforeInTLLD(Term1, Terms1))
+    if Term1 =/= Term2
+    /\ sameConstSortLD(Term1, Term2) .
+
+  eq indexConstSortBeforeInTLLD(Term1, (Term2 , Terms1))
+    = indexConstSortBeforeInTLLD(Term1, Terms1)
+    [owise] .
+
+  eq indexConstSortBeforeInTLLD(Term1, Term2) = 0 [owise] .
+
+  --------------------------------------------------------------------------
+  --- Print stored lemma equations.
+  --------------------------------------------------------------------------
+  op lemmaEqSet2StrLD : EquationSet -> String .
+  op lemmaEq2StrLD : Equation -> String .
+
+  eq lemmaEqSet2StrLD(none) = "" .
+  eq lemmaEqSet2StrLD(Eq) = lemmaEq2StrLD(Eq) .
+  eq lemmaEqSet2StrLD(Eq EQs)
+    = lemmaEq2StrLD(Eq)
+      + lemmaEqSet2StrLD(EQs)
+    [owise] .
+
+  eq lemmaEq2StrLD(eq LhsTerm = RhsTerm [Attrs] .)
+    =
+      "  eq "
+      + term2StrLD(LhsTerm)
+      + " = "
+      + term2StrLD(RhsTerm)
+      + " .\n" .
+
+endm
+
+--- false case
+---   -> try to use existing lemmas
+---   -> if still false:
+---        try to gen lemma
+---        generate lemma success lmN
+---        add lmN into getPrscILemma
+---        add lmN into InputSpec 
+---        try to use lmN to handle current false case
+---   -> after finish one transition:
+---        collect lemma from all PrscList, not last(...)
+---        add lemma into invariant set
+---        add op/eq lemma into module spec
+---        generate proof scores for new lemma
+
+mod LD-AUTO is
+  pr LD-CLASSIFY .
+  pr LD-CANDIDATE .
+
+  vars InputSpec InputSpec2 : IPSGInputSpec .
+  var ModuleSpec : IPSGModuleSpec .
+  vars ProofScore ProofScore2 : IPSGProofScore .
+
+  vars Attrs : AttrSet .
+  vars Eq : Equation .
+  var Assumptions : EquationSet .
+  vars LhsTerm RhsTerm : Term .
+  vars StateTerm Term1 : Term .
+  vars Terms Terms1 Terms2 : TermList .
+
+  var DerItem : DerivedItem .
+  vars DerItems DerItems2 : DerivedSet .
+  vars EQs : EquationSet .
+  vars N : Nat .
+
+  vars NameStr TypeStr LemmaStr : String .
+  var LmNo : Nat .
+  var FreshLmNo : Nat .
+
+  vars SeedEqs : EquationSet .
+  vars AcceptedEqs CandEqs : EquationSet .
+  vars ExistingLms AcceptedLms : ListLemmas .
+  vars LMS LMS2 NewLms : ListLemmas .
+  vars LM LM2 : LemmaGenerated .
+  var AutoRes : AutoLmResult .
+  var OP : OpDecl .
+  var Body : Term .
+  var LmName : Qid .
+  var VarSorts : TypeList .
+
+  --------------------------------------------------------------------------
+  --- Result of automatic lemma generation.
+  --- It stores:
+  ---   1. accepted lemma equations,
+  ---   2. accepted LemmaGenerated list,
+  ---   3. next lemma number.
+  --------------------------------------------------------------------------
+  sort AutoLmResult .
+
+  op autoLmResultLD : EquationSet ListLemmas Nat -> AutoLmResult [ctor] .
+  op getAutoLmEqsLD : AutoLmResult -> EquationSet .
+  op getAutoLmLmsLD : AutoLmResult -> ListLemmas .
+  op getAutoLmNextNoLD : AutoLmResult -> Nat .
+
+  eq getAutoLmEqsLD(autoLmResultLD(EQs, LMS, LmNo)) = EQs .
+  eq getAutoLmLmsLD(autoLmResultLD(EQs, LMS, LmNo)) = LMS .
+  eq getAutoLmNextNoLD(autoLmResultLD(EQs, LMS, LmNo)) = LmNo .
+
+  --------------------------------------------------------------------------
+  --- Automatic lemma generation for one false proof score.
+  ---
+  --- We use all state equations in the false case as seed equations.
+  --- For each seed, we derive candidate lemmas.
+  --- Before accepting a lemma, we check whether its body already exists.
+  --------------------------------------------------------------------------
+  op autoCandidateLemmasPrscLD : IPSGProofScore IPSGModuleSpec IPSGInputSpec -> AutoLmResult .
+  op autoCandidateLemmasFromSeedsLD : EquationSet IPSGProofScore IPSGModuleSpec IPSGInputSpec
+    ListLemmas EquationSet ListLemmas Nat -> AutoLmResult .
+  op autoCandidateLemmasFromDerSetLD : DerivedSet DerivedSet IPSGProofScore IPSGModuleSpec IPSGInputSpec
+    ListLemmas EquationSet ListLemmas Nat -> AutoLmResult .
+  op autoAcceptCandidateEqSetLD : EquationSet ListLemmas EquationSet ListLemmas Nat -> AutoLmResult .
+  op autoAcceptCandidateEqLD : Equation ListLemmas EquationSet ListLemmas Nat -> AutoLmResult .
+
+  ceq autoCandidateLemmasPrscLD(ProofScore, ModuleSpec, InputSpec)
+    = autoCandidateLemmasFromSeedsLD(
+        SeedEqs,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        getIPSGLms(getPrscILemma(ProofScore)), --- get existing lemmas from proof score
+        none,
+        (nil).ListLemmas,
+        freshLemmaNoLD(
+          incLD(getIPSGLmsNo(getPrscILemma(ProofScore))),
+          getInputSpecInvsTarget(InputSpec)))
+    if StateTerm := firstParamConstTermLD(getInvTargetParams(ProofScore))
+    /\ Assumptions := mapNatEq2EqSetLD(getPrscMapEqs(ProofScore))
+    /\ EQs := effectiveCondEqsLD(ProofScore, ModuleSpec)
+    /\ SeedEqs := selectStateEqsLD(Assumptions, EQs, StateTerm) .
+
+  eq autoCandidateLemmasFromSeedsLD(
+        none,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoLmResultLD(AcceptedEqs, AcceptedLms, LmNo) .
+
+  ceq autoCandidateLemmasFromSeedsLD(
+        Eq SeedEqs,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoCandidateLemmasFromSeedsLD(
+        SeedEqs,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        getAutoLmEqsLD(AutoRes),
+        getAutoLmLmsLD(AutoRes),
+        getAutoLmNextNoLD(AutoRes))
+    if DerItems2 := derivedItemsFromSeedLD(Eq, InputSpec, ModuleSpec, ProofScore)
+    /\ AutoRes :=
+        autoCandidateLemmasFromDerSetLD(
+          DerItems2,
+          DerItems2,
+          ProofScore,
+          ModuleSpec,
+          InputSpec,
+          ExistingLms,
+          AcceptedEqs,
+          AcceptedLms,
+          LmNo) .
+
+  eq autoCandidateLemmasFromSeedsLD(
+        Eq,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoCandidateLemmasFromSeedsLD(
+        Eq none,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    [owise] .
+
+  eq autoCandidateLemmasFromDerSetLD(
+        emptyD,
+        DerItems2,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoLmResultLD(AcceptedEqs, AcceptedLms, LmNo) .
+
+  ceq autoCandidateLemmasFromDerSetLD(
+        DerItem +++ DerItems,
+        DerItems2,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoCandidateLemmasFromDerSetLD(
+        DerItems,
+        DerItems2,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        getAutoLmEqsLD(AutoRes),
+        getAutoLmLmsLD(AutoRes),
+        getAutoLmNextNoLD(AutoRes))
+    if FreshLmNo :=
+         freshLemmaNoLD(
+           LmNo,
+           getInputSpecInvsTarget(InputSpec))
+    /\ CandEqs :=
+         candidateLemmaEqFromDerLD(
+           FreshLmNo,
+           DerItem,
+           DerItems2,
+           InputSpec,
+           ModuleSpec,
+           ProofScore)
+    /\ AutoRes :=
+         autoAcceptCandidateEqSetLD(
+           CandEqs,
+           ExistingLms,
+           AcceptedEqs,
+           AcceptedLms,
+           FreshLmNo) .
+
+  ceq autoCandidateLemmasFromDerSetLD(
+        DerItem,
+        DerItems2,
+        ProofScore,
+        ModuleSpec,
+        InputSpec,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoAcceptCandidateEqSetLD(
+        CandEqs,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        FreshLmNo)
+    if FreshLmNo :=
+         freshLemmaNoLD(
+           LmNo,
+           getInputSpecInvsTarget(InputSpec))
+    /\ CandEqs :=
+         candidateLemmaEqFromDerLD(
+           FreshLmNo,
+           DerItem,
+           DerItems2,
+           InputSpec,
+           ModuleSpec,
+           ProofScore) .
+
+  eq autoAcceptCandidateEqSetLD(
+        none,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoLmResultLD(AcceptedEqs, AcceptedLms, LmNo) .
+
+  eq autoAcceptCandidateEqSetLD(
+        Eq,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoAcceptCandidateEqLD(
+        Eq,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Duplicate check for generated lemmas.
+  ---
+  --- We compare lemma bodies, not lemma names.
+  --- Example:
+  ---   eq lm1(S,P) = BODY .
+  ---   eq lm3(S,P) = BODY .
+  --- are treated as the same lemma.
+  --------------------------------------------------------------------------
+  op lemmaEqExistsLD : Equation ListLemmas EquationSet -> Bool .
+  op lemmaBodyInLmsLD : Term ListLemmas -> Bool .
+  op lemmaBodyInEqSetLD : Term EquationSet -> Bool .
+
+  eq lemmaEqExistsLD(eq LhsTerm = Body [Attrs] ., ExistingLms, AcceptedEqs)
+    = lemmaBodyInLmsLD(Body, ExistingLms)
+      or
+      lemmaBodyInEqSetLD(Body, AcceptedEqs) .
+
+  eq lemmaBodyInLmsLD(Body, (nil).ListLemmas) = false .
+
+  ceq lemmaBodyInLmsLD(
+        Body,
+        lm(OP, eq LhsTerm = RhsTerm [Attrs] ., N) LMS)
+    = true
+    if Body == RhsTerm .
+
+  eq lemmaBodyInLmsLD(
+        Body,
+        lm(OP, eq LhsTerm = RhsTerm [Attrs] ., N) LMS)
+    = lemmaBodyInLmsLD(Body, LMS)
+    [owise] .
+
+  eq lemmaBodyInEqSetLD(Body, none) = false .
+
+  ceq lemmaBodyInEqSetLD(
+        Body,
+        (eq LhsTerm = RhsTerm [Attrs] .) EQs)
+    = true
+    if Body == RhsTerm .
+
+  eq lemmaBodyInEqSetLD(
+        Body,
+        (eq LhsTerm = RhsTerm [Attrs] .) EQs)
+    = lemmaBodyInEqSetLD(Body, EQs)
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Convert a stored lemma equation to LemmaGenerated.
+  ---
+  --- Input:
+  ---   eq lmN(Vars) = Body .
+  ---
+  --- Output:
+  ---   lm(op lmN : VarSorts -> Bool ., eq lmN(Vars) = Body ., N)
+  --------------------------------------------------------------------------
+  op vars2TypeListLD : TermList -> TypeList .
+  op lmFromEqLD : Equation Nat -> LemmaGenerated .
+
+  eq vars2TypeListLD(empty) = nil .
+  eq vars2TypeListLD((Term1 , Terms1))
+    = getType(Term1)
+      vars2TypeListLD(Terms1) .
+
+  eq vars2TypeListLD(Term1)
+    = getType(Term1)
+    [owise] .
+
+  ceq lmFromEqLD(
+        eq LmName[Terms1] = RhsTerm [Attrs] .,
+        LmNo)
+    =
+      lm(
+        op LmName : VarSorts -> 'Bool [none] .,
+        eq LmName[Terms1] = RhsTerm [none] .,
+        LmNo)
+    if VarSorts := vars2TypeListLD(Terms1) .
+
+  --------------------------------------------------------------------------
+  --- Accept one candidate equation if it is not duplicated.
+  --------------------------------------------------------------------------
+  ceq autoAcceptCandidateEqLD(
+        Eq,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoLmResultLD(AcceptedEqs, AcceptedLms, LmNo)
+    if lemmaEqExistsLD(Eq, ExistingLms, AcceptedEqs) .
+
+  eq autoAcceptCandidateEqLD(
+        Eq,
+        ExistingLms,
+        AcceptedEqs,
+        AcceptedLms,
+        LmNo)
+    = autoLmResultLD(
+        AcceptedEqs Eq,
+        AcceptedLms (lmFromEqLD(Eq, LmNo) (nil).ListLemmas),
+        incLD(LmNo))
+    [owise] .
+
+  --------------------------------------------------------------------------
+  --- Print generated lemma names.
+  --------------------------------------------------------------------------
+  op generatedLmNamesStrLD : ListLemmas -> String .
+  op generatedLmNamesTailStrLD : ListLemmas -> String .
+
+  eq generatedLmNamesStrLD((nil).ListLemmas) = "" .
+
+  eq generatedLmNamesStrLD(LM LMS)
+    =
+      string(getLmName(LM))
+      + generatedLmNamesTailStrLD(LMS) .
+
+  eq generatedLmNamesTailStrLD((nil).ListLemmas) = "" .
+
+  eq generatedLmNamesTailStrLD(LM LMS)
+    =
+      ", "
+      + string(getLmName(LM))
+      + generatedLmNamesTailStrLD(LMS) .
+
+  --------------------------------------------------------------------------
+  --- Entry point called automatically when a false case is reached.
+  ---
+  --- If new lemmas are generated, attach them to the current proof score.
+  --- Later, the existing proof-score generation loop will collect these
+  --- generated lemmas from getPrscILemma(last(...)), add them to the input
+  --- invariant set, and generate proof scores for them.
+  --------------------------------------------------------------------------
+  op autoGenLemmaPrsc : IPSGProofScore IPSGModuleSpec IPSGInputSpec TermList -> PrscList .
+
+  ceq autoGenLemmaPrsc(ProofScore, ModuleSpec, InputSpec, Terms)
+    = tryUseLemmaLog(
+        ProofScore2,
+        ModuleSpec,
+        InputSpec2,
+        Terms)
+    if AutoRes := autoCandidateLemmasPrscLD(ProofScore, ModuleSpec, InputSpec)
+    /\ NewLms := getAutoLmLmsLD(AutoRes)
+    /\ NewLms =/= (nil).ListLemmas
+    /\ ProofScore2 := addLemmas2Prsc(ProofScore, NewLms)
+    /\ InputSpec2 := addLmsInv(InputSpec, lms2InvList(NewLms))
+    /\ NameStr := generatedLmNamesStrLD(NewLms)
+    /\ LemmaStr := lemmaEqSet2StrLD(getAutoLmEqsLD(AutoRes))
+    [print "--> try to gen lemma\n"
+           "--> generate lemma success " NameStr
+           "\n--> generated lemma:\n"
+           LemmaStr] .
+
+  eq autoGenLemmaPrsc(ProofScore, ModuleSpec, InputSpec, Terms)
+    = markFalsePrsc(ProofScore)
+    [owise print "--> try to gen lemma\n"
+                 "    generate lemma fail"] .
+
+endm
+
+--- Main module for lemma discovery.
+mod LEMMA-DISCOVERY is
+  pr LD-AUTO .
+
+endm

@@ -1,0 +1,14 @@
+ipsgopen QLOCK .
+  -- inv mutex(S:Sys, P:Pid, Q:Pid) .
+  -- inv inv2(S:Sys, P:Pid) .
+  generate mutex(S:Sys, P:Pid, Q:Pid) induction on S:Sys .
+  -- generate inv2(S:Sys, P:Pid) induction on S:Sys .
+close
+
+set-output examples/Qlock/proof-scores.cafe .
+:save-proof .
+
+eof
+
+load examples/Qlock/input.cafe .
+load examples/Qlock/qlock.cafe .

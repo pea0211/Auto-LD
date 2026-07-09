@@ -1,0 +1,200 @@
+-- Loop: Remainder Section
+--  rs: place[i] = fetch&incmode(next,N);
+--  ws: repeat until array[place[i]];
+--    Critical Section
+--  cs: array[place[i]],array[(place[i]+1) % N] = false,true;
+
+-- in ./snat
+-- in ../snat
+
+mod! LABEL {
+  [Label]
+  ops rs ws cs : -> Label {constr}
+  eq (rs = ws) = false .
+  eq (rs = cs) = false .
+  eq (ws = cs) = false .
+}
+
+mod* PID {
+  [Pid]
+}
+
+mod* SIMPLE-NAT {
+  [ SZero SNzNat < SNat ]
+  [ SOne < SNzNat ]
+  op 0 : -> SZero {constr}
+  op s : SNat -> SNzNat {constr}
+  vars I J G H : SNat
+  var K : SNzNat
+  eq (0 = K) = false .
+  eq (0 = s(I)) = false .
+  eq (I = s(I)) = false .
+
+  -- pred _<_ : SNat SNat .
+  op _<_ : SNat SNat -> Bool .
+  eq (I < 0) = false .
+  eq (0 < K) = true .
+  eq (I < s(I)) = true .
+  eq (I < s(s(I))) = true .
+  eq (I < I) = false .
+  ceq (I < s(J)) = true if I < J .
+  ceq (s(I) < J) = false if (I < J) = false .
+  eq (s(I) = s(J)) = (I = J) .
+  ceq (I < s(0)) = false if (I = 0) = false .
+  ceq (I < s(J)) = false if (I = J) = false and (I < J) = false .
+  ceq (s(I) < s(J)) = true if I < J . 
+  ceq (I = J) = true if ((I < J) = false and (J < I) = false) .
+  ceq (I < s(J)) = true if (J < I) = false .
+  ceq ((I + G) < (I + H)) = false if (G < H) = false .
+  ceq ((I + G) < (I + H)) = true if (G < H) .
+
+  -- for v1
+  op _ + _ : SNat SNat -> SNat {comm assoc}
+  op _ rem _ : SNat SNzNat -> SNat
+  op sd : SNat SNat -> SNat 
+  op 1 : -> SOne {constr} 
+  
+  eq s(0) = 1 .
+  eq sd(I, 0) = I .
+  eq sd(s(I), 1) = I .
+  eq sd(s(I), s(J)) = sd(I, J) .
+  eq (I rem 1) = 0 .
+  eq (0 rem K) = 0 .
+  eq (K rem K) = 0 .
+  eq (J + (I rem K)) rem K = (I + J) rem K .
+  ceq (I = (s(I) rem K)) = false if 1 < K .
+  ceq ((I rem K) = (s(I) rem K)) = false if 1 < K .
+  eq (s(I rem K) rem K) = (s(I) rem K) .
+  ceq ((I rem K) = (J rem K)) = false if I < (J + K) and J < I .
+  eq 0 + I = I .
+  eq 1 + I = s(I) .
+  eq s(I) + J = s(I + J) .
+  eq s(I + sd(J,1)) = I + J .
+  eq (sd(I,1) = I) = false .
+  eq (I + J = I + G) = (J = G) .
+
+  -- for inv9
+  ceq (I < sd(J,1)) = false if (I < J) = false .
+  ceq (I < s(J)) = false if (J < I) .
+
+  -- for simulation
+  ceq (s(I) < s(J)) = false if (I < J) = false .
+  ceq (I < K) = false if (I = 0) = false and (I rem K) = 0 . 
+  ceq ((I rem K) = (s(J) rem K)) = false if I < s(J + K) and s(J) < I .
+  op lemma1 : SNat SNat -> Bool .
+  eq lemma1(I,J) = ((I = J) = false and (J < I) = false) implies (I < J) .
+  eq ((K + I) rem K) = (I rem K) .
+  ceq ((I + J) = s(J)) = false if 1 < I .
+  ceq (s(J) < (I + J)) = true if 1 < I .
+  ceq (I = (J + sd(I,1))) = false if (1 < J and 0 < I) .
+  op lemma2 : SNat SNat SNat SNat -> Bool .
+  -- eq lemma2(I,J,G,H) = ((I = s(J)) = false and G = (J + H) and 0 < H) implies 
+  --     (G = (I + sd(H,1))) = false .
+  eq lemma2(I,J,G,H) =
+    ((((I = s(J)) = false) and ((G = (J + H)) and (0 < H)))
+    implies ((G = (I + sd(H,1))) = false)) .
+  ceq ((I + sd(G,1)) < J + G) = true if (I < J and 0 < G) .
+  ceq ((I + J) = (G + sd(J,1))) = false if ((G = s(I)) = false and 0 < J) .
+  op lemma3 : SNat SNat -> Bool .
+  eq lemma3(I,J) = ((s(I) < J) implies (I < J)) .
+  ceq ((I + sd(G,1)) < (J + G)) = false if ((I < J) = false and (I = J) = false and 0 < G) .
+  ceq ((I + J) < (G + H)) = true if (I < s(H) and (I = H) = false and (G < J) = false) .
+
+  -- new
+  ceq ((I + J) rem K = (I + sd(J,1)) rem K) = false if 1 < K .
+}
+
+mod* ANDERSON {
+  pr(LABEL + PID + SIMPLE-NAT)
+  [Sys]
+-- any initial state
+  op init : -> Sys {constr}
+  
+-- transitions
+  op want : Sys Pid -> Sys {constr}
+  op try  : Sys Pid -> Sys {constr}
+  op exit : Sys Pid -> Sys {constr}
+
+-- observations
+  op pc : Sys Pid -> Label
+  op next : Sys -> SNat .
+  op place : Sys Pid -> SNat .
+  op array : Sys SNat -> Bool .
+  op count : Sys -> SNat .
+
+  var S : Sys
+  vars P Q : Pid
+  vars I J : SNat
+
+  op N : -> SNzNat
+  -- suppose N > 1 .
+  eq (1 < N) = true .
+
+-- for any initial state
+  eq pc(init,P) = rs .
+  eq next(init) = 0 .
+  eq place(init,P) = 0 .
+  eq array(init,I) = (if I = 0 then true else false fi) .
+  eq count(init) = 0 .
+
+-- want
+  op c-want : Sys Pid -> Bool
+  eq c-want(S,P) = (pc(S,P) = rs and count(S) < N) .
+  ceq pc(want(S,P),Q) = (if P = Q then ws else pc(S,Q) fi) if c-want(S,P) .
+  ceq place(want(S,P),Q) = (if P = Q then next(S) else place(S,Q) fi) if c-want(S,P) .
+  ceq next(want(S,P)) = (s(next(S)) rem N) if c-want(S,P) .
+  eq array(want(S,P),I) = array(S,I) .
+  ceq count(want(S,P)) = s(count(S)) if c-want(S,P) .
+  ceq want(S,P) = S if c-want(S,P) = false .
+  
+-- try
+  op c-try : Sys Pid -> Bool 
+  eq c-try(S,P) = (pc(S,P) = ws and array(S,place(S,P)) = true) .
+  ceq pc(try(S,P),Q) = (if P = Q then cs else pc(S,Q) fi) if c-try(S,P) .
+  eq place(try(S,P),Q) = place(S,Q) .
+  eq array(try(S,P),I) = array(S,I) .
+  eq next(try(S,P)) = next(S) .
+  eq count(try(S,P)) = count(S) .
+  ceq try(S,P) = S if c-try(S,P) = false .
+
+-- exit
+  op c-exit : Sys Pid -> Bool
+  eq c-exit(S,P) = (pc(S,P) = cs) .
+  ceq pc(exit(S,P),Q) = (if P = Q then rs else pc(S,Q) fi) if c-exit(S,P) .
+  eq place(exit(S,P),Q) = place(S,Q) .
+  eq next(exit(S,P)) = next(S) .
+  ceq array(exit(S,P),I) = (
+    if I = s(place(S,P)) rem N then
+      true
+    else (
+      if I = place(S,P) then 
+        false 
+      else
+        array(S,I) 
+      fi ) 
+    fi ) if c-exit(S,P) .
+  ceq count(exit(S,P)) = (sd(count(S),1)) if c-exit(S,P) .
+  ceq exit(S,P) = S if c-exit(S,P) = false .
+
+  -- invariants
+  op mutex : Sys Pid Pid -> Bool
+  op lm1 : Sys Pid Pid -> Bool
+
+  eq mutex(S,P,Q) = (pc(S,P) = cs and pc(S,Q) = cs implies (P = Q)) .
+  eq lm1(S,P,Q) = ((pc(S, P) = cs and (P = Q) = false) implies array(S, place(S, Q)) = false) .
+}
+
+-- mod ADS-INV {
+--   pr(ANDERSON)
+
+-- -- invariants
+--   op mutex : Sys Pid Pid -> Bool
+--   op inv0 : Sys -> Bool
+
+--   var S : Sys .
+--   vars P Q : Pid .
+
+--   eq mutex(S,P,Q) = (pc(S,P) = cs and pc(S,Q) = cs implies (P = Q)) .
+
+--   eq inv0(S) = (N < count(S)) = false .
+-- }

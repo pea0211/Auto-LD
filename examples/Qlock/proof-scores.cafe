@@ -1,0 +1,359 @@
+--> ID = mutex.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op s : -> Sys .
+  red mutex(init,p,q) .
+close
+
+--> ID = mutex.2.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq p = r1 .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
+close
+
+--> ID = mutex.2.1.2.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq q = r1 .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
+close
+
+--> ID = mutex.2.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq (q = r1) = false .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
+close
+
+--> ID = mutex.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (pc(s,r1) = cs) = false .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.1.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq p = r1 .
+  eq q = r1 .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.1.1.2.1 true, use lm1 as a lemma
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq p = r1 .
+  eq (q = r1) = false .
+  eq pc(s,q) = cs .
+  red lm1(s,q) implies (mutex(s,p,q) implies mutex(try(s,r1),p,q)) .
+close
+
+--> ID = mutex.3.1.1.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq p = r1 .
+  eq (q = r1) = false .
+  eq (pc(s,q) = cs) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.1.2.1.1 true, use lm1 as a lemma
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  eq q = r1 .
+  eq pc(s,p) = cs .
+  red lm1(s,p) implies (mutex(s,p,q) implies mutex(try(s,r1),p,q)) .
+close
+
+--> ID = mutex.3.1.1.2.1.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  eq q = r1 .
+  eq (pc(s,p) = cs) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  eq (q = r1) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq (pc(s,r1) = ws) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (top(queue(s)) = r1) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.4.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq p = r1 .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
+close
+
+--> ID = mutex.4.1.2.1 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq (p = r1) = false .
+  eq q = r1 .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
+close
+
+--> ID = mutex.4.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq (p = r1) = false .
+  eq (q = r1) = false .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
+close
+
+--> ID = mutex.4.2 true
+open QLOCK .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (pc(s,r1) = rs) = false .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
+close
+
+--> ID = lm1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op s : -> Sys .
+  red lm1(init,p) .
+close
+
+--> ID = lm1.2.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq p = r1 .
+  red lm1(s,p) implies lm1(exit(s,r1),p) .
+close
+
+--> ID = lm1.2.1.2.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq top(queue(s)) = p .
+  eq top(deq(queue(s))) = p .
+  red lm1(s,p) implies lm1(exit(s,r1),p) .
+close
+
+--> ID = lm1.2.1.2.1.2.1 true, use mutex as a lemma
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq top(queue(s)) = p .
+  eq (top(deq(queue(s))) = p) = false .
+  eq pc(s,p) = cs .
+  red mutex(s,p,r1) implies (lm1(s,p) implies lm1(exit(s,r1),p)) .
+close
+
+--> ID = lm1.2.1.2.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq top(queue(s)) = p .
+  eq (top(deq(queue(s))) = p) = false .
+  eq (pc(s,p) = cs) = false .
+  red lm1(s,p) implies lm1(exit(s,r1),p) .
+close
+
+--> ID = lm1.2.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = cs .
+  eq (p = r1) = false .
+  eq (top(queue(s)) = p) = false .
+  red lm1(s,p) implies lm1(exit(s,r1),p) .
+close
+
+--> ID = lm1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (pc(s,r1) = cs) = false .
+  red lm1(s,p) implies lm1(exit(s,r1),p) .
+close
+
+--> ID = lm1.3.1.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq p = r1 .
+  red lm1(s,p) implies lm1(try(s,r1),p) .
+close
+
+--> ID = lm1.3.1.1.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  red lm1(s,p) implies lm1(try(s,r1),p) .
+close
+
+--> ID = lm1.3.1.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq top(queue(s)) = r1 .
+  eq (pc(s,r1) = ws) = false .
+  red lm1(s,p) implies lm1(try(s,r1),p) .
+close
+
+--> ID = lm1.3.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (top(queue(s)) = r1) = false .
+  red lm1(s,p) implies lm1(try(s,r1),p) .
+close
+
+--> ID = lm1.4.1.1 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq p = r1 .
+  red lm1(s,p) implies lm1(want(s,r1),p) .
+close
+
+--> ID = lm1.4.1.2.1 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq (p = r1) = false .
+  eq top(queue(s)) = p .
+  red lm1(s,p) implies lm1(want(s,r1),p) .
+close
+
+--> ID = lm1.4.1.2.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq pc(s,r1) = rs .
+  eq (p = r1) = false .
+  eq (top(queue(s)) = p) = false .
+  red lm1(s,p) implies lm1(want(s,r1),p) .
+close
+
+--> ID = lm1.4.2 true
+open QLOCK .
+  op p : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq (pc(s,r1) = rs) = false .
+  red lm1(s,p) implies lm1(want(s,r1),p) .
+close
+
+--> Time taken is 36ms

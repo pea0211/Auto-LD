@@ -1,0 +1,2 @@
+load LD_interface.maude
+erew run .

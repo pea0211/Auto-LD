@@ -1,0 +1,31 @@
+load IPSG/ipsg_grammar.maude
+
+***(
+  define syntax for the input file
+)
+
+fmod LD-TERM-COMMAND-SYNTAX is
+  pr INPUT .
+  --- show prsc by mutex.2.1 .
+  op show prsc by_. : @NeTokenList@ -> @Input@ .
+  --- list false case .
+  op list false cases . : -> @Input@ .
+  --- list symbolic state forms of the currently loaded protocol .
+  op list symbolic state forms . : -> @Input@ .
+  --- classify assumptions of a proof score by ID .
+  op classify assumptions by_. : @NeTokenList@ -> @Input@ .
+  --- construct ORT from a seed equation .
+  op ORT of_. : @NeTokenList@ -> @Input@ .
+  --- derive equations from a false proof score by ID .
+  op derived equations of_by_. : @NeTokenList@ @NeTokenList@ -> @Input@ .
+  --- generate candidate lemmas from a false proof score by ID .
+  op candidate lemmas of_by_. : @NeTokenList@ @NeTokenList@ -> @Input@ .
+endfm
+
+fmod LD-GRAMMAR is
+  pr IPSG-GRAMMAR .
+  --- pr META-CIM-SIGN .
+  op LDGRAMMAR : -> FModule .
+  eq LDGRAMMAR
+    = addImports(IPSGGRAMMAR, (including 'LD-TERM-COMMAND-SYNTAX .)) .
+endfm

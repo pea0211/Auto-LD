@@ -1,0 +1,3 @@
+load cafeInMaude_without_run.maude
+erew run .
+*** maude -allow-files cafeInMaude.maude
