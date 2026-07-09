@@ -13,16 +13,8 @@ IPSG> load examples/Qlock/input.cafe .
 
 where the first command starts the tool, the second command loads the Qlock specification, and the last command loads the input file, which asks the tool to generate the proof scores to prove Qlock enjoys the mutual exclusion properties (i.e., the proof scores of `inv1` and `inv2`).
 
-load examples/TAS/tas.cafe .
-load examples/TAS/input.cafe .
-
-<!-- List all false cases by ID -->
-list false cases .
-
-<!-- Show proof score by ID -->
-show prsc by mutex.2.1.2.1.2.1 .
-
-<!-- Test for QLOCK -->
+### Test for QLOCK 
+```bash
 load examples/Qlock/qlock.cafe .
 load examples/Qlock/input.cafe .
 list false cases .
@@ -38,8 +30,10 @@ classify assumptions by mutex.3.1.1.2.1.1 .
 ORT of pc(s,p) = cs .
 derived equations of pc(s,p) = cs by mutex.3.1.1.2.1.1 .
 candidate lemmas of pc(s,p) = cs by mutex.3.1.1.2.1.1 .
+```
 
-<!-- Test for TAS -->
+### Test for TAS
+```bash
 load examples/TAS/tas.cafe .
 load examples/TAS/input.cafe .
 list false cases .
@@ -50,8 +44,10 @@ classify assumptions by mutex.2.1.2.1.2.1 .
 ORT of pc(s,q) = cs .
 derived equations of pc(s,q) = cs by mutex.2.1.2.1.2.1 .
 candidate lemmas of pc(s,q) = cs by mutex.2.1.2.1.2.1 .
+```
 
-<!-- Test for Anderson -->
+### Test for ANDERSON
+```bash
 load examples/Anderson/anderson.cafe .
 load examples/Anderson/input.cafe .
 list false cases .
@@ -86,8 +82,4 @@ classify assumptions by lm1.3.1.1.1.2.1 .
 ORT of array(s,place(s,q)) = true .
 derived equations of array(s,place(s,q)) = true by lm1.3.1.1.1.2.1 .
 candidate lemmas of array(s,place(s,q)) = true by lm1.3.1.1.1.2.1 .
-
-
-maude -allow-files cafeinmaude3/cafeInMaude.maude
-
-maude -allow-files auto_LD.maude
+```
