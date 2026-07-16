@@ -244,4 +244,4 @@ open TAS .
   red lm1(s,p) implies lm1(exit(s,r1),p) .
 close
 
---> Time taken is 18ms
+--> Time taken is 26ms

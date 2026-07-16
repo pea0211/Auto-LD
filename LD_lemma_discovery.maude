@@ -1,8 +1,5 @@
 ***(
-  Lemma discovery support commands for IPSG.
-
-  This file contains only lemma-discovery-related helper functions.
-  The current step only supports listing symbolic state forms.
+  Auto Lemma Discovery Implementation 
 )
 mod LD-COMMON is
   pr IPSG-HANDLE .

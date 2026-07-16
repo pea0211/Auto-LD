@@ -1,6 +1,6 @@
 load IPSG/ipsg_interface.maude
-load LD_grammar.maude
-load LD_lemma_discovery.maude
+load ld_grammar.maude
+load ld_lemma_discovery.maude
 
 mod LD is
   pr MTP .
@@ -35,9 +35,11 @@ mod LD is
    write(stdout, cafeInMaude, "The introduced command does not exit.\n")
    if noParse(N) := metaParse(LDGRAMMAR, tokenize(Text), '@Input@) .
 
-****************
-****************
-*** Lemma_Discovery
+***********************
+***********************
+*** Lemma_Discovery ***
+***********************
+***********************
 
    --------------------------------------------------------------------------
    --- Show proof score by id

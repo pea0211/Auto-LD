@@ -1,7 +1,7 @@
 load IPSG/ipsg_grammar.maude
 
 ***(
-  define syntax for the input file
+  define syntax for the interactive support commands
 )
 
 fmod LD-TERM-COMMAND-SYNTAX is

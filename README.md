@@ -6,7 +6,7 @@ To run the tool, first you need to install Maude, which can be found from here: 
 Once Maude is installed, you can try to run the tool with the following commands:
 
 ```bash
-$ maude -allow-files LD.maude
+$ maude -allow-files ld.maude
 IPSG> load examples/TAS/tas.cafe .
 IPSG> load examples/TAS/input.cafe .
 ```
