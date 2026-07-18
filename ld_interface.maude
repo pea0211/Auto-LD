@@ -35,11 +35,11 @@ mod LD is
    write(stdout, cafeInMaude, "The introduced command does not exit.\n")
    if noParse(N) := metaParse(LDGRAMMAR, tokenize(Text), '@Input@) .
 
-***********************
-***********************
-*** Lemma_Discovery ***
-***********************
-***********************
+   ***********************
+   ***********************
+   *** Lemma_Discovery ***
+   ***********************
+   ***********************
 
    --------------------------------------------------------------------------
    --- Show proof score by id
@@ -308,7 +308,6 @@ mod LD is
    --------------------------------------------------------------------------
    --- Derived equations of <seed-equation> by <proof-score-id>
    --------------------------------------------------------------------------
-
    rl [derivedequationsof-no-data] :
       < cafeInMaude : CIM | state: executeComm,
          input: 'derived`equations`of_by_.['neTokenList[T], 'neTokenList[T2]],
@@ -365,7 +364,6 @@ mod LD is
    --------------------------------------------------------------------------
    --- Candidate lemmas of <seed-equation> by <proof-score-id>
    --------------------------------------------------------------------------
-
    rl [candidatelemmasof-no-data] :
       < cafeInMaude : CIM | state: executeComm,
          input: 'candidate`lemmas`of_by_.['neTokenList[T], 'neTokenList[T2]],

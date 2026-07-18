@@ -59,22 +59,23 @@ mod LD-COMMON is
   op _+++_ : DerivedSet DerivedSet -> DerivedSet [assoc comm idem id: emptyD] .
 
   --- Qids and operator names
-  vars ModName ParamName ParamSortName EffCondOpName ObserverName qName OpName : Qid .
+  vars Q ModName ParamName ParamSortName EffCondOpName ObserverName qName OpName : Qid .
 
   --- Strings
-  vars InputStr CleanSeedStr ObserverStr StateStr ArgStr TargetStr : String .
+  vars S InputStr CleanSeedStr ObserverStr StateStr ArgStr TargetStr : String .
 
   --- IPSG structures
-  vars InputSpec : IPSGInputSpec .
-  vars ModuleSpec : IPSGModuleSpec .
+  vars INSPX InputSpec : IPSGInputSpec .
+  vars MSX ModuleSpec : IPSGModuleSpec .
   var InvTarget : InvariantTarget .
   var InvTargets : InvTargetList .
-  var ProofScore : IPSGProofScore .
-  var ProofScoreList : PrscList .
+  vars PRSCX ProofScore : IPSGProofScore .
+  vars PRSCSX : IPSGProofScores .
+  vars PRSCLX ProofScoreList : PrscList .
   var EqMap : MapNatEquation .
 
   --- Meta-level module components
-  var ProtocolMod : Module .
+  vars M ProtocolMod : Module .
   var Imports : ImportList .
   var Sorts : SortSet .
   var SubsortDecls : SubsortDeclSet .
@@ -95,12 +96,93 @@ mod LD-COMMON is
   vars G G2 : GammaList .
 
   --- Terms and term lists
-  vars LhsTerm RhsTerm Term1 Term2 : Term .
+  vars T LhsTerm RhsTerm Term1 Term2 : Term .
   vars Terms Terms2 : TermList .
   vars FORMALS ACTUALS : TermList .
+  vars TOKS TOKS2 : TermList .
 
   --- Natural numbers and string positions
   vars N N1 N2 N3 N4 : Nat .
+
+  --------------------------------------------------------------------------
+  --- Proof score ID and seed equation input string
+  --------------------------------------------------------------------------
+  op token2String : Term -> String .
+  ceq token2String('token[T]) = printTokens(downTerm(T, 'error)) if T =/= none .
+  eq token2String(T) = "" [owise] .
+
+  op termList2String : TermList -> String .
+  eq termList2String(empty) = "" .
+  ceq termList2String((T, TOKS)) = token2String(T) + termList2String(TOKS) if TOKS =/= empty .
+  eq termList2String(T) = token2String(T) [owise] .
+
+  op psIdInputStr : Term -> String .
+  --- Read the raw parsed argument term exactly as entered in the terminal,
+  --- then normalize it so IDs like mutex.2.1.2.1.2.1 compare correctly.
+  ceq psIdInputStr(T) = normalizePsIdString(printTokens(downTerm(T, 'error))) if T =/= none .
+  eq psIdInputStr(T) = "" [owise] .
+
+  op seedEqInputStr : Term -> String .
+  ceq seedEqInputStr(T) = printTokens(downTerm(T, 'error)) if T =/= none .
+  eq seedEqInputStr(T) = "" [owise] .
+
+  --------------------------------------------------------------------------
+  --- Show proof score by ID
+  --------------------------------------------------------------------------
+   op showPrscLastStr : IPSGInputSpec IPSGModuleSpec IPSGProofScores String -> String .
+   op showPrscListStr : Qid PrscList Module String -> String .
+
+   eq showPrscLastStr(INSPX, MSX, PRSCSX, S)
+    = "Protocol: " + string(getInputSpecMod(INSPX)) + "\n" +
+      showPrscListStr(getInputSpecMod(INSPX), getPrscList(PRSCSX), getSpecModule(MSX), S) .
+
+   eq showPrscListStr(Q, (nil).PrscList, M, S)
+    = "No proof score with ID " + normalizePsIdString(S) + " in protocol " + string(Q) + "." .
+   ceq showPrscListStr(Q, PRSCX PRSCLX, M, S)
+    = $toOpenCloseStr(Q, PRSCX, M)
+    if psId2String(getPrscId(PRSCX)) == normalizePsIdString(S) .
+   eq showPrscListStr(Q, PRSCX PRSCLX, M, S)
+    = showPrscListStr(Q, PRSCLX, M, S) [owise] .
+
+  --------------------------------------------------------------------------
+  --- List false cases
+  --------------------------------------------------------------------------
+  op isFalsePrsc : IPSGProofScore -> Bool .
+  op countFalsePrscs : PrscList -> Nat .
+  op falseIdsStr : PrscList -> String .
+  op falseIdsTailStr : PrscList -> String .
+  op falseCaseReportLastStr : IPSGInputSpec IPSGProofScores -> String .
+
+  eq isFalsePrsc(PRSCX) = (getPrscComment(PRSCX) == 'false) .
+
+  eq countFalsePrscs((nil).PrscList) = 0 .
+  eq countFalsePrscs(PRSCX PRSCLX)
+    = if isFalsePrsc(PRSCX)
+      then s(countFalsePrscs(PRSCLX))
+      else countFalsePrscs(PRSCLX)
+      fi .
+
+  eq falseIdsStr((nil).PrscList) = "" .
+  eq falseIdsStr(PRSCX PRSCLX)
+    = if isFalsePrsc(PRSCX)
+      then psId2String(getPrscId(PRSCX)) + falseIdsTailStr(PRSCLX)
+      else falseIdsStr(PRSCLX)
+      fi .
+
+  eq falseIdsTailStr((nil).PrscList) = "" .
+  eq falseIdsTailStr(PRSCX PRSCLX)
+    = if isFalsePrsc(PRSCX)
+      then ", " + psId2String(getPrscId(PRSCX)) + falseIdsTailStr(PRSCLX)
+      else falseIdsTailStr(PRSCLX)
+      fi .
+
+  eq falseCaseReportLastStr(INSPX, PRSCSX)
+    = "Protocol: " + string(getInputSpecMod(INSPX)) + "\n" +
+      "False cases: " + string(countFalsePrscs(getPrscList(PRSCSX)), 10) +
+      (if countFalsePrscs(getPrscList(PRSCSX)) == 0
+        then "\nIDs: (none)"
+        else "\nIDs: " + falseIdsStr(getPrscList(PRSCSX))
+        fi) .
   
   --------------------------------------------------------------------------
   --- Print equation sets
@@ -3801,8 +3883,6 @@ mod LD-AUTO is
   --- generated lemmas from getPrscILemma(last(...)), add them to the input
   --- invariant set, and generate proof scores for them.
   --------------------------------------------------------------------------
-  op autoGenLemmaPrsc : IPSGProofScore IPSGModuleSpec IPSGInputSpec TermList -> PrscList .
-
   ceq autoGenLemmaPrsc(ProofScore, ModuleSpec, InputSpec, Terms)
     = tryUseLemmaLog(
         ProofScore2,

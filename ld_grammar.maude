@@ -24,7 +24,6 @@ endfm
 
 fmod LD-GRAMMAR is
   pr IPSG-GRAMMAR .
-  --- pr META-CIM-SIGN .
   op LDGRAMMAR : -> FModule .
   eq LDGRAMMAR
     = addImports(IPSGGRAMMAR, (including 'LD-TERM-COMMAND-SYNTAX .)) .

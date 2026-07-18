@@ -17,7 +17,6 @@ load cafeinmaude3/command_parsing.maude
 load cafeinmaude3/io.maude
 load time.maude
 load ipsg_core.maude
---- load ipsg_lemma_discovery.maude
 
 mod MTP is
    pr (MAYBE * (op maybe to null)){Oid} .
@@ -28,7 +27,6 @@ mod MTP is
    pr IPSG-GRAMMAR .
    pr IPSG-HANDLE .
    pr INPUT-IPSG-PARSE .
-   --- pr IPSG-LEMMA-DISCOVERY .
 
    vars M M' M'' TOP FLAT FROM TO CURR : Module .
    vars TSM TSM' HSM HSM' MS : TheorySortMap .
@@ -57,79 +55,7 @@ mod MTP is
    var  Q : Qid .
    *** For testing
    var CPR : [CafeParseResult] .
-   vars PRSCX : IPSGProofScore .
-   vars PRSCLX : PrscList .
-   vars INSPX : IPSGInputSpec .
-   vars MSX : IPSGModuleSpec .
-   vars PRSCSX : IPSGProofScores .
-   vars TOKS TOKS2 : TermList .
 
-   op token2String : Term -> String .
-   ceq token2String('token[T]) = printTokens(downTerm(T, 'error)) if T =/= none .
-   eq token2String(T) = "" [owise] .
-
-   op termList2String : TermList -> String .
-   eq termList2String(empty) = "" .
-   ceq termList2String((T, TOKS)) = token2String(T) + termList2String(TOKS) if TOKS =/= empty .
-   eq termList2String(T) = token2String(T) [owise] .
-
-   op psIdInputStr : Term -> String .
-   --- Read the raw parsed argument term exactly as entered in the terminal,
-   --- then normalize it so IDs like mutex.2.1.2.1.2.1 compare correctly.
-   ceq psIdInputStr(T) = normalizePsIdString(printTokens(downTerm(T, 'error))) if T =/= none .
-   eq psIdInputStr(T) = "" [owise] .
-
-   op seedEqInputStr : Term -> String .
-   ceq seedEqInputStr(T) = printTokens(downTerm(T, 'error)) if T =/= none .
-   eq seedEqInputStr(T) = "" [owise] .
-
-   op isFalsePrsc : IPSGProofScore -> Bool .
-   eq isFalsePrsc(PRSCX) = (getPrscComment(PRSCX) == 'false) .
-
-   op countFalsePrscs : PrscList -> Nat .
-   eq countFalsePrscs((nil).PrscList) = 0 .
-   eq countFalsePrscs(PRSCX PRSCLX)
-     = if isFalsePrsc(PRSCX)
-       then s(countFalsePrscs(PRSCLX))
-       else countFalsePrscs(PRSCLX)
-       fi .
-
-   op falseIdsStr : PrscList -> String .
-   op falseIdsTailStr : PrscList -> String .
-   eq falseIdsStr((nil).PrscList) = "" .
-   eq falseIdsStr(PRSCX PRSCLX)
-     = if isFalsePrsc(PRSCX)
-       then psId2String(getPrscId(PRSCX)) + falseIdsTailStr(PRSCLX)
-       else falseIdsStr(PRSCLX)
-       fi .
-   eq falseIdsTailStr((nil).PrscList) = "" .
-   eq falseIdsTailStr(PRSCX PRSCLX)
-     = if isFalsePrsc(PRSCX)
-       then ", " + psId2String(getPrscId(PRSCX)) + falseIdsTailStr(PRSCLX)
-       else falseIdsTailStr(PRSCLX)
-       fi .
-
-   op showPrscLastStr : IPSGInputSpec IPSGModuleSpec IPSGProofScores String -> String .
-   op showPrscListStr : Qid PrscList Module String -> String .
-   eq showPrscLastStr(INSPX, MSX, PRSCSX, S)
-     = "Protocol: " + string(getInputSpecMod(INSPX)) + "\n" +
-       showPrscListStr(getInputSpecMod(INSPX), getPrscList(PRSCSX), getSpecModule(MSX), S) .
-   eq showPrscListStr(Q, (nil).PrscList, M, S)
-     = "No proof score with ID " + normalizePsIdString(S) + " in protocol " + string(Q) + "." .
-   ceq showPrscListStr(Q, PRSCX PRSCLX, M, S)
-     = $toOpenCloseStr(Q, PRSCX, M)
-     if psId2String(getPrscId(PRSCX)) == normalizePsIdString(S) .
-   eq showPrscListStr(Q, PRSCX PRSCLX, M, S)
-     = showPrscListStr(Q, PRSCLX, M, S) [owise] .
-
-   op falseCaseReportLastStr : IPSGInputSpec IPSGProofScores -> String .
-   eq falseCaseReportLastStr(INSPX, PRSCSX)
-     = "Protocol: " + string(getInputSpecMod(INSPX)) + "\n" +
-       "False cases: " + string(countFalsePrscs(getPrscList(PRSCSX)), 10) +
-       (if countFalsePrscs(getPrscList(PRSCSX)) == 0
-        then "\nIDs: (none)"
-        else "\nIDs: " + falseIdsStr(getPrscList(PRSCSX))
-        fi) .
    *** For printing and waiting for more input.
    op print&idle : -> State [ctor] .
    *** Loading file.

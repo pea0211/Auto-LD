@@ -178,10 +178,10 @@ mod* ANDERSON {
 
   -- invariants
   op mutex : Sys Pid Pid -> Bool
-  op lm1 : Sys Pid Pid -> Bool
+  -- op lm1 : Sys Pid Pid -> Bool
 
   eq mutex(S,P,Q) = (pc(S,P) = cs and pc(S,Q) = cs implies (P = Q)) .
-  eq lm1(S,P,Q) = ((pc(S, P) = cs and (P = Q) = false) implies array(S, place(S, Q)) = false) .
+  -- eq lm1(S,P,Q) = ((pc(S, P) = cs and (P = Q) = false) implies array(S, place(S, Q)) = false) .
 }
 
 -- mod ADS-INV {

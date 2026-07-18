@@ -25,13 +25,3 @@ fmod IPSG-GRAMMAR is
   op IPSGGRAMMAR : -> FModule .
   eq IPSGGRAMMAR = addImports(GRAMMAR, (including 'IPSG-INPUT-SYNTAX .)) .
 endfm
-
---- fmod IPSG-GRAMMAR is
----   pr META-CIM-SIGN .
----   op IPSGGRAMMAR : -> FModule .
----   eq IPSGGRAMMAR
----     = addImports(
----         addImports(GRAMMAR, (including 'IPSG-INPUT-SYNTAX .)),
----         (including 'IPSG-TERM-COMMAND-SYNTAX .)
----       ) .
---- endfm

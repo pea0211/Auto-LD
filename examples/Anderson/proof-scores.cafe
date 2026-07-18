@@ -1,12 +1,12 @@
---> ID = lm1.1 true
+--> ID = mutex.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
   op s : -> Sys .
-  red lm1(init,p,q) .
+  red mutex(init,p,q) .
 close
 
---> ID = lm1.2.1.1 true
+--> ID = mutex.2.1.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -14,10 +14,10 @@ open ANDERSON .
   op s : -> Sys .
   eq pc(s,r1) = cs .
   eq p = r1 .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
 close
 
---> ID = lm1.2.1.2.1.1 true
+--> ID = mutex.2.1.2.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -25,12 +25,11 @@ open ANDERSON .
   op s : -> Sys .
   eq pc(s,r1) = cs .
   eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq place(s,q) = place(s,r1) .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
+  eq q = r1 .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
 close
 
---> ID = lm1.2.1.2.1.2.1.1.1 true
+--> ID = mutex.2.1.2.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -38,763 +37,21 @@ open ANDERSON .
   op s : -> Sys .
   eq pc(s,r1) = cs .
   eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
+  eq (q = r1) = false .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
 close
 
---> ID = lm1.2.1.2.1.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.1.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.1.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.1.2.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.2.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.2.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.1.2.2.2.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.1.2.2.2.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq place(s,q) = place(s,r1) .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.1.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.1.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.1.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.2.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.2.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.2.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.1.2.2.2.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = true .
-  eq (place(s,q) = place(s,r1)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.1.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.1.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.1.1.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.1.1.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.2.2.1.1.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq (s(place(s,r1)) rem N) = place(s,q) .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = true .
-  eq ((s(place(s,r1)) rem N) = place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.2.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq p = q .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.2.2.1.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.1.2.2.2.2.2.2.1.2 true, use mutex as a lemma
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq pc(s,p) = cs .
-  eq array(s,place(s,q)) = false .
-  red mutex(s,p,r1) implies (lm1(s,p,q) implies lm1(exit(s,r1),p,q)) .
-close
-
---> ID = lm1.2.1.2.2.2.2.2.2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = cs .
-  eq (p = r1) = false .
-  eq (place(s,q) < place(s,r1)) = false .
-  eq (place(s,r1) < place(s,q)) = false .
-  eq ((s(place(s,r1)) rem N) < place(s,q)) = false .
-  eq (place(s,q) < (s(place(s,r1)) rem N)) = false .
-  eq (p = q) = false .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
-close
-
---> ID = lm1.2.2 true
+--> ID = mutex.2.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
   op r1 : -> Pid .
   op s : -> Sys .
   eq (pc(s,r1) = cs) = false .
-  red lm1(s,p,q) implies lm1(exit(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(exit(s,r1),p,q) .
 close
 
---> ID = lm1.3.1.1.1.1 true
+--> ID = mutex.3.1.1.1.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -804,10 +61,10 @@ open ANDERSON .
   eq pc(s,r1) = ws .
   eq p = r1 .
   eq q = r1 .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.3.1.1.1.2.1 false
+--> ID = mutex.3.1.1.1.2.1 false
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -817,11 +74,11 @@ open ANDERSON .
   eq pc(s,r1) = ws .
   eq p = r1 .
   eq (q = r1) = false .
-  eq array(s,place(s,q)) = true .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  eq pc(s,q) = cs .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.3.1.1.1.2.2 true
+--> ID = mutex.3.1.1.1.2.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -831,11 +88,11 @@ open ANDERSON .
   eq pc(s,r1) = ws .
   eq p = r1 .
   eq (q = r1) = false .
-  eq array(s,place(s,q)) = false .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  eq (pc(s,q) = cs) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.3.1.1.2 true
+--> ID = mutex.3.1.1.2.1.1 false
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -844,10 +101,39 @@ open ANDERSON .
   eq array(s,place(s,r1)) = true .
   eq pc(s,r1) = ws .
   eq (p = r1) = false .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  eq q = r1 .
+  eq pc(s,p) = cs .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.3.1.2 true
+--> ID = mutex.3.1.1.2.1.2 true
+open ANDERSON .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq array(s,place(s,r1)) = true .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  eq q = r1 .
+  eq (pc(s,p) = cs) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.1.2.2 true
+open ANDERSON .
+  op p : -> Pid .
+  op q : -> Pid .
+  op r1 : -> Pid .
+  op s : -> Sys .
+  eq array(s,place(s,r1)) = true .
+  eq pc(s,r1) = ws .
+  eq (p = r1) = false .
+  eq (q = r1) = false .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
+close
+
+--> ID = mutex.3.1.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -855,20 +141,20 @@ open ANDERSON .
   op s : -> Sys .
   eq array(s,place(s,r1)) = true .
   eq (pc(s,r1) = ws) = false .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.3.2 true
+--> ID = mutex.3.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
   op r1 : -> Pid .
   op s : -> Sys .
   eq array(s,place(s,r1)) = false .
-  red lm1(s,p,q) implies lm1(try(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(try(s,r1),p,q) .
 close
 
---> ID = lm1.4.1.1.1 true
+--> ID = mutex.4.1.1.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -877,10 +163,10 @@ open ANDERSON .
   eq pc(s,r1) = rs .
   eq (count(s) < N) = true .
   eq p = r1 .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> ID = lm1.4.1.1.2.1.1.1.1 true
+--> ID = mutex.4.1.1.2.1 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -890,58 +176,10 @@ open ANDERSON .
   eq (count(s) < N) = true .
   eq (p = r1) = false .
   eq q = r1 .
-  eq pc(s,p) = cs .
-  eq array(s,next(s)) = true .
-  eq array(s,place(s,r1)) = true .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> ID = lm1.4.1.1.2.1.1.1.2 false
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = rs .
-  eq (count(s) < N) = true .
-  eq (p = r1) = false .
-  eq q = r1 .
-  eq pc(s,p) = cs .
-  eq array(s,next(s)) = true .
-  eq array(s,place(s,r1)) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
-close
-
---> ID = lm1.4.1.1.2.1.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = rs .
-  eq (count(s) < N) = true .
-  eq (p = r1) = false .
-  eq q = r1 .
-  eq pc(s,p) = cs .
-  eq array(s,next(s)) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
-close
-
---> ID = lm1.4.1.1.2.1.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op q : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  eq pc(s,r1) = rs .
-  eq (count(s) < N) = true .
-  eq (p = r1) = false .
-  eq q = r1 .
-  eq (pc(s,p) = cs) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
-close
-
---> ID = lm1.4.1.1.2.2 true
+--> ID = mutex.4.1.1.2.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -951,10 +189,10 @@ open ANDERSON .
   eq (count(s) < N) = true .
   eq (p = r1) = false .
   eq (q = r1) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> ID = lm1.4.1.2 true
+--> ID = mutex.4.1.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
@@ -962,48 +200,17 @@ open ANDERSON .
   op s : -> Sys .
   eq pc(s,r1) = rs .
   eq (count(s) < N) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> ID = lm1.4.2 true
+--> ID = mutex.4.2 true
 open ANDERSON .
   op p : -> Pid .
   op q : -> Pid .
   op r1 : -> Pid .
   op s : -> Sys .
   eq (pc(s,r1) = rs) = false .
-  red lm1(s,p,q) implies lm1(want(s,r1),p,q) .
+  red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> ID = lm2.1 true
-open ANDERSON .
-  op p : -> Pid .
-  op s : -> Sys .
-  red lm2(p) .
-close
-
---> ID = lm2.2 true
-open ANDERSON .
-  op p : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  red lm2(p) implies lm2(p) .
-close
-
---> ID = lm2.3 true
-open ANDERSON .
-  op p : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  red lm2(p) implies lm2(p) .
-close
-
---> ID = lm2.4 true
-open ANDERSON .
-  op p : -> Pid .
-  op r1 : -> Pid .
-  op s : -> Sys .
-  red lm2(p) implies lm2(p) .
-close
-
---> Time taken is 212ms
+--> Time taken is 86ms
