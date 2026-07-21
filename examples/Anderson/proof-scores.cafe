@@ -213,4 +213,4 @@ open ANDERSON .
   red mutex(s,p,q) implies mutex(want(s,r1),p,q) .
 close
 
---> Time taken is 86ms
+--> Time taken is 75ms

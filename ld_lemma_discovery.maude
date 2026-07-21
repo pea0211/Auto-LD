@@ -12,52 +12,6 @@ mod LD-COMMON is
   op emptyG : -> GammaList .
   op _;G_ : GammaList GammaList -> GammaList [assoc id: emptyG] .
 
-  sorts ORTLeaf ORTNode ORT .
-  subsort ORTLeaf < ORTNode .
-  subsort ORTNode < ORT .
-
-  --- non-terminal node: current equation + Gamma
-  op node : Equation GammaList -> ORTNode .
-
-  --- terminal nodes / leaves
-  op trueLeaf : -> ORTLeaf .
-  op falseLeaf : -> ORTLeaf .
-  op similarLeaf : Equation -> ORTLeaf .
-  op invalidLeaf : Equation -> ORTLeaf .
-
-  --- set of ORT nodes
-  op emptyN : -> ORT .
-  op _+N_ : ORT ORT -> ORT [assoc comm idem id: emptyN] .
-
-  sorts ORTBranch ORTBranchSet .
-  subsort ORTBranch < ORTBranchSet .
-
-  --- branch(symbolic state form, Gamma, leaf)
-  op branch : Term GammaList ORTLeaf -> ORTBranch .
-
-  op emptyB : -> ORTBranchSet .
-  op _++_ : ORTBranchSet ORTBranchSet -> ORTBranchSet [assoc comm idem id: emptyB] .
-
-  sorts DerivedItem DerivedSet .
-  subsort DerivedItem < DerivedSet .
-
-  --- der(original seed, branch-level seed instance, Gamma, E[v/s],
-  ---     affected equation e, derived equation d)
-  ---
-  --- E[v/s]:
-  ---   the assumption set after substituting v for s,
-  ---   excluding the seed equation
-  ---
-  --- affected equation:
-  ---   e in Aff_{E[v/s]}
-  ---
-  --- derived equation:
-  ---   lhs(e) = x''
-  op der : Equation Equation GammaList EquationSet Equation Equation -> DerivedItem .
-
-  op emptyD : -> DerivedSet .
-  op _+++_ : DerivedSet DerivedSet -> DerivedSet [assoc comm idem id: emptyD] .
-
   --- Qids and operator names
   vars Q ModName ParamName ParamSortName EffCondOpName ObserverName qName OpName : Qid .
 
@@ -908,6 +862,32 @@ endm
 mod LD-ORT is
   pr LD-SYMBOLIC .
 
+  sorts ORTLeaf ORTNode ORT .
+  subsort ORTLeaf < ORTNode .
+  subsort ORTNode < ORT .
+
+  --- non-terminal node: current equation + Gamma
+  op node : Equation GammaList -> ORTNode .
+
+  --- terminal nodes / leaves
+  op trueLeaf : -> ORTLeaf .
+  op falseLeaf : -> ORTLeaf .
+  op similarLeaf : Equation -> ORTLeaf .
+  op invalidLeaf : Equation -> ORTLeaf .
+
+  --- set of ORT nodes
+  op emptyN : -> ORT .
+  op _+N_ : ORT ORT -> ORT [assoc comm idem id: emptyN] .
+
+  sorts ORTBranch ORTBranchSet .
+  subsort ORTBranch < ORTBranchSet .
+
+  --- branch(symbolic state form, Gamma, leaf)
+  op branch : Term GammaList ORTLeaf -> ORTBranch .
+
+  op emptyB : -> ORTBranchSet .
+  op _++_ : ORTBranchSet ORTBranchSet -> ORTBranchSet [assoc comm idem id: emptyB] .
+
   --- Generic matching
   sort MatchSubstLD .
 
@@ -963,20 +943,6 @@ mod LD-ORT is
   vars Cond1 Cond2 : EqCondition .
   vars CurArgs SpecArgs : TermList .
   vars CurrentLhs Current SpecLhs : Term .
-
-  --------------------------------------------------------------------------
-  --- ORT construction from a seed equation
-  ---
-  --- Logical order:
-  ---   1. Handle the user command ORT of <seed>.
-  ---   2. Build a parsing module containing proof-score constants.
-  ---   3. Parse the seed equation entered by the user.
-  ---   4. Enumerate symbolic state forms and instantiate the seed.
-  ---   5. Develop each ORT branch by reducing the current equation under Gamma.
-  ---   6. Split branches when an unresolved condition is encountered.
-  ---   7. Stop at trueLeaf, falseLeaf, similarLeaf, or invalidLeaf.
-  ---   8. Print all leaves and then feasible branches.
-  --------------------------------------------------------------------------
 
   --------------------------------------------------------------------------
   --- User command entry
@@ -2008,7 +1974,7 @@ mod LD-ORT is
   --- ORT output report
   ---
   --- The command prints:
-  ---   1. all terminal leaves of the ORT;
+  ---   1. all terminal branches of the ORT;
   ---   2. feasible branches, i.e., branches ending in trueLeaf.
   --------------------------------------------------------------------------
 
@@ -2021,7 +1987,7 @@ mod LD-ORT is
 
   eq ortBranchReportStrLD(Branches)
     =
-      "ORT leaves:\n"
+      "ORT branches:\n"
       + noneIfEmptyBranchesLD(branchSet2LeavesStrLD(Branches))
       + "Feasible branches in ORT:\n"
       + noneIfEmptyBranchesLD(branchSet2FeasibleStrLD(Branches)) .
@@ -2078,6 +2044,26 @@ endm
 --------------------------------------------------------------------------
 mod LD-DERIVE is
   pr LD-ORT .
+
+  sorts DerivedItem DerivedSet .
+  subsort DerivedItem < DerivedSet .
+
+  --- der(original seed, branch-level seed instance, Gamma, E[v/s],
+  ---     affected equation e, derived equation d)
+  ---
+  --- E[v/s]:
+  ---   the assumption set after substituting v for s,
+  ---   excluding the seed equation
+  ---
+  --- affected equation:
+  ---   e in Aff_{E[v/s]}
+  ---
+  --- derived equation:
+  ---   lhs(e) = x''
+  op der : Equation Equation GammaList EquationSet Equation Equation -> DerivedItem .
+
+  op emptyD : -> DerivedSet .
+  op _+++_ : DerivedSet DerivedSet -> DerivedSet [assoc comm idem id: emptyD] .
 
   vars ModName OpName : Qid .
   vars InputStr InputStr2 : String .

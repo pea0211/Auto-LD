@@ -356,4 +356,4 @@ open QLOCK .
   red lm1(s,p) implies lm1(want(s,r1),p) .
 close
 
---> Time taken is 36ms
+--> Time taken is 39ms
