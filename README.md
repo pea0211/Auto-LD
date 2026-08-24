@@ -13,7 +13,7 @@ IPSG> load examples/TAS/input.cafe .
 
 where the first command starts the tool, the second command loads the Qlock specification, and the last command loads the input file, which asks the tool to generate the proof scores to prove Qlock enjoys the mutual exclusion properties (i.e., the proof score of `mutex`).
 
-### Test for QLOCK 
+### Test command for QLOCK 
 ```bash
 load examples/Qlock/qlock.cafe .
 load examples/Qlock/input.cafe .
@@ -26,7 +26,7 @@ derived equations of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
 candidate lemmas of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
 ```
 
-### Test for TAS
+### Test command for TAS
 ```bash
 load examples/TAS/tas.cafe .
 load examples/TAS/input.cafe .
