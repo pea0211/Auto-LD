@@ -18,19 +18,12 @@ where the first command starts the tool, the second command loads the Qlock spec
 load examples/Qlock/qlock.cafe .
 load examples/Qlock/input.cafe .
 list false cases .
-show prsc by inv2.4.1.2.1 .
 show prsc by mutex.3.1.1.1.2.1 .
 list symbolic state forms .
 classify assumptions by mutex.3.1.1.1.2.1 .
 ORT of pc(s,q) = cs .
 derived equations of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
 candidate lemmas of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
-
-show prsc by mutex.3.1.1.2.1.1 .
-classify assumptions by mutex.3.1.1.2.1.1 .
-ORT of pc(s,p) = cs .
-derived equations of pc(s,p) = cs by mutex.3.1.1.2.1.1 .
-candidate lemmas of pc(s,p) = cs by mutex.3.1.1.2.1.1 .
 ```
 
 ### Test for TAS
@@ -39,49 +32,9 @@ load examples/TAS/tas.cafe .
 load examples/TAS/input.cafe .
 list false cases .
 show prsc by mutex.2.1.2.1.2.1 .
-show prsc by mutex.2.1.2.2.1.1 .
 list symbolic state forms .
 classify assumptions by mutex.2.1.2.1.2.1 .
 ORT of pc(s,q) = cs .
 derived equations of pc(s,q) = cs by mutex.2.1.2.1.2.1 .
 candidate lemmas of pc(s,q) = cs by mutex.2.1.2.1.2.1 .
-```
-
-### Test for ANDERSON
-```bash
-load examples/Anderson/anderson.cafe .
-load examples/Anderson/input.cafe .
-list false cases .
-show prsc by mutex.3.1.1.1.2.1 .
-show prsc by mutex.3.1.1.2.1.1 .
-list symbolic state forms .
-classify assumptions by mutex.3.1.1.1.2.1 .
-ORT of pc(s,q) = cs .
-derived equations of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
-candidate lemmas of pc(s,q) = cs by mutex.3.1.1.1.2.1 .
-
-
-show prsc by lm1.4.1.1.2.1.1.1.2 .
-list symbolic state forms .
-classify assumptions by lm1.4.1.1.2.1.1.1.2 .
-
-ORT of array(s,next(s)) = true .
-derived equations of array(s,next(s)) = true by lm1.4.1.1.2.1.1.1.2 .
-candidate lemmas of array(s,next(s)) = true by lm1.4.1.1.2.1.1.1.2 .
-
-ORT of array(s,place(s,r1)) = false .
-derived equations of array(s,place(s,r1)) = false by lm1.4.1.1.2.1.1.1.2 .
-candidate lemmas of array(s,place(s,r1)) = false by lm1.4.1.1.2.1.1.1.2 .
-
-ORT of pc(s,p) = cs .
-derived equations of pc(s,p) = cs by lm1.4.1.1.2.1.1.1.2 .
-candidate lemmas of pc(s,p) = cs by lm1.4.1.1.2.1.1.1.2 .
-
-
-show prsc by lm1.3.1.1.1.2.1 .
-list symbolic state forms .
-classify assumptions by lm1.3.1.1.1.2.1 .
-ORT of array(s,place(s,q)) = true .
-derived equations of array(s,place(s,q)) = true by lm1.3.1.1.1.2.1 .
-candidate lemmas of array(s,place(s,q)) = true by lm1.3.1.1.1.2.1 .
 ```
